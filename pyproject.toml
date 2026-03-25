@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yolov8-pcb-detection"
+version = "0.1.0"
+authors = [
+    { name="Olegofriendz", email="abuga@mail.ru" }
+]
+description = "PCB Component Detection with YOLOv8"
+requires-python = ">=3.10"
+dependencies = [
+    "roboflow",
+    "ultralytics",
+    "python-dotenv",
+    "pyyaml"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[project.scripts]
+pcb-download = "src.data.download:main"
+pcb-tile = "src.data.tile:main"
+pcb-train = "src.training.train:main"

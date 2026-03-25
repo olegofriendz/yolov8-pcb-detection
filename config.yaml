@@ -1,0 +1,15 @@
+dataset:
+  workspace: "oleg-scesf"
+  name: "one-board-dataset"
+  version: 4
+  download_format: "yolov8"
+
+training:
+  model: "yolov8m.pt"
+  epochs: 150
+  imgsz: 640
+  batch: 8
+  device: 0
+
+paths:
+  runs_dir: "./runs"
