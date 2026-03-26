@@ -102,8 +102,8 @@ def slice_yolov8_dataset(input_dir, output_dir, tile_size=640, overlap=0.2, min_
 
 def tile_dataset(config: Dict, tile_size=640, overlap=0.2, min_objects=1, keep_empty=False):
     project_name = config.get("dataset", {}).get("name", "one-board-dataset")
-    input_dir = PROJECT_ROOT / project_name
-    output_dir = PROJECT_ROOT / f"{project_name}-tiled"
+    input_dir = PROJECT_ROOT / "data" / project_name
+    output_dir = PROJECT_ROOT / "data" / f"{project_name}-tiled"
     
     logger.info(f"Input: {input_dir}")
     logger.info(f"Output: {output_dir}")

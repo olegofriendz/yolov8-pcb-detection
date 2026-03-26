@@ -27,9 +27,9 @@ def load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
         )
 
     project_name = config.get("dataset", {}).get("name", "one-board-dataset") # название проекта
-    config["paths"]["dataset_dir"] = str(PROJECT_ROOT / project_name) # полный путь к датасету
+    config["paths"]["dataset_dir"] = str(PROJECT_ROOT / "data" / project_name) # полный путь к датасету
     config["paths"]["project_root"] = str(PROJECT_ROOT) # корень
-    config["training"]["data_yaml"] = str(PROJECT_ROOT / project_name / "data.yaml") # полный путь к data.yaml в датасете
+    config["training"]["data_yaml"] = str(PROJECT_ROOT / "data" / f"{project_name}-tiled" / "data.yaml") # полный путь к data.yaml в датасете
     config["training"]["project_name"] = project_name # копия названия для training
 
     return config

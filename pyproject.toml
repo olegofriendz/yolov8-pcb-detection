@@ -25,3 +25,4 @@ include = ["src*"]
 pcb-download = "src.data.download:main"
 pcb-tile = "src.data.tile:main"
 pcb-train = "src.training.train:main"
+pcb-detect = "src.inference.detect:main"

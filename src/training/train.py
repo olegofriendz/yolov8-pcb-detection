@@ -2,9 +2,8 @@
 import logging
 from pathlib import Path
 from typing import Dict
-
 from ultralytics import YOLO
-from src.config import load_config
+from src.config import load_config, PROJECT_ROOT
 
 logger = logging.getLogger(__name__)
 

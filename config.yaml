@@ -5,11 +5,14 @@ dataset:
   download_format: "yolov8"
 
 training:
-  model: "yolov8m.pt"
+  model: "weights/yolov8m.pt"
   epochs: 150
   imgsz: 640
   batch: 8
   device: 0
+
+inference:
+  device: "cuda:0"
 
 paths:
   runs_dir: "./runs"
