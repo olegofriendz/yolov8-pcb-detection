@@ -8,7 +8,7 @@ from rknn.api import RKNN
 RKNN_MODEL = "runs/detect/one-board-dataset/weights/best.rknn"
 IMG_SIZE = 640
 CONF_THRES = 0.6 # уверенность
-NMS_THRES = 0.8 # близкие объекты
+NMS_THRES = 0.4 # близкие объекты
 CAMERA_ID = 0
 NUM_CLASSES = 5
 CLASS_NAMES = ['chip-capacitor', 'chip-resistor', 'diode', 'ic', 'transistor']
@@ -177,6 +177,8 @@ def main():
 
         step = 3.0
         send('G91')
+        history = []
+        STABLE_FRAMES = 3
 
         while True:
             ret, frame = camera.read()
@@ -197,7 +199,34 @@ def main():
             
             detections = postprocess_yolov8(outputs, orig_shape=(h, w), x_off=x_off, y_off=y_off, 
                                             conf_thres=CONF_THRES, nms_thres=NMS_THRES, num_classes=NUM_CLASSES)
-            frame = draw_detections(frame, detections, CLASS_NAMES)
+            
+            # стабилизация (если кадры случайные -> пропуск элемента)
+            new_history = []
+            for det in detections:
+                cx = (det['box'][0] + det['box'][2]) / 2
+                cy = (det['box'][1] + det['box'][3]) / 2
+                matched = False
+                for h in history:
+                    if h['class'] == det['class'] and abs(h['cx'] - cx) < 25 and abs(h['cy'] - cy) < 25:
+                        h['count'] += 1
+                        h['cx'], h['cy'] = cx, cy
+                        h['box'] = det['box']
+                        h['score'] = det['score']
+                        new_history.append(h)
+                        matched = True
+                        break
+                if not matched:
+                    new_history.append({'class': det['class'], 'cx': cx, 'cy': cy, 'count': 1, 
+                                        'box': det['box'], 'score': det['score']})
+            
+            history = new_history
+            stable = [h for h in history if h['count'] >= STABLE_FRAMES]
+            stable_dets = [{'box': h['box'], 'class': h['class'], 'score': h['score']} for h in stable]
+
+
+
+
+            frame = draw_detections(frame, stable_dets, CLASS_NAMES)
 
             cv2.rectangle(frame, (x_off, y_off), (x_off + IMG_SIZE, y_off + IMG_SIZE), (0, 255, 0), 1)
             cv2.putText(frame, f"Detect: {len(detections)}", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
