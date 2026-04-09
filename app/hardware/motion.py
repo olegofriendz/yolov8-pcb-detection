@@ -14,7 +14,7 @@ class MotionContoller:
 
     def disconnect(self):
         if self.ser and self.ser.is_open:
-            self.ser.write("G90")
+            self.send("G90")
             self.ser.close()
 
     # отправить g-код и получить ответ
@@ -41,4 +41,5 @@ class MotionContoller:
         return responce
     
     def home(self):
-        self.send("G28")
+        self.send("G90")
+        self.send("G1 X0 Y0 F1000")
