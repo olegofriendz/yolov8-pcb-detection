@@ -13,7 +13,7 @@ def run_detection(config: Dict, camera_id: int, conf: float, imgsz: int) -> None
     
     runs_dir = PROJECT_ROOT / config["paths"].get("runs_dir", "runs")
     project_name = config["training"]["project_name"]
-    weights_path = runs_dir / "detect" / project_name / "weights" / "best.pt"
+    weights_path = runs_dir / "detect" / project_name / "weights" / "best.rknn"
     
     if not weights_path.exists():
         raise FileNotFoundError(f"Модель не найдена: {weights_path}")
@@ -23,8 +23,8 @@ def run_detection(config: Dict, camera_id: int, conf: float, imgsz: int) -> None
     
     logger.info(f"Открываем камеру {camera_id}...")
     cap = cv2.VideoCapture(camera_id)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 3840)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 2160)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 640)
     cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
     
     if not cap.isOpened():

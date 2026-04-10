@@ -12,7 +12,7 @@ training:
   device: 0
 
 inference:
-  device: "cuda:0"
+  device: "cpu"
 
 paths:
   runs_dir: "./runs"
