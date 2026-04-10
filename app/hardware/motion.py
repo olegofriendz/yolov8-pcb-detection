@@ -7,18 +7,32 @@ class MotionContoller:
         self.port = port
         self.baud = baud
         self.ser = None
+        self.connected = False
+
 
     def connect(self):
-        self.ser = serial.Serial(self.port, self.baud, timeout=1)
-        time.sleep(2)
+        try:
+            self.ser = serial.Serial(self.port, self.baud, timeout=1)
+            time.sleep(2)
+            print(f"Контроллер {self.port} подключен.")
+            self.connected = True
+        except:
+            print(f"Контроллер {self.port} не найден. Управление отключено.")
+            self.ser = None
+            self.connected = False
+
 
     def disconnect(self):
-        if self.ser and self.ser.is_open:
+        if self.ser and self.ser.is_open and self.connected:
             self.send("G90")
             self.ser.close()
 
+
     # отправить g-код и получить ответ
     def send(self, cmd: str) -> str:
+        if not self.connected:
+            return ""
+
         self.ser.write(f"{cmd}\n".encode())
         responce = ""
         while True:
@@ -30,16 +44,29 @@ class MotionContoller:
                 break
         return response
     
+
     def move_relative(self, x=0, y=0, feedrate=1000) -> str:
+        if not self.connected:
+            return ""
+
         self.send("G91") # относительные координаты
         responce = self.send(f"G1 X{x} Y{y} F{feedrate}")
         return responce
     
+
     def move_absolute(self, x, y, feedrate=1000) -> str:
+        if not self.connected:
+            return ""
+
         self.send("G90")
         responce = self.send(f"G1 X{x} Y{y} F{feedrate}")
         return responce
     
+
     def home(self):
+        if not self.connected:
+            print("Управление недоступно!")
+            return ""
+
         self.send("G90")
         self.send("G1 X0 Y0 F1000")

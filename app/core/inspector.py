@@ -51,7 +51,7 @@ class Inspector:
     def process_frame(self, x_off=None, y_off=None):
         ret, frame = self.camera.read()
         if not ret or frame is None:
-            return None, [], 0
+            return None, []
         
         detections, crop_frame, (x_off_actual, y_off_actual) = self.detector.detect(
             frame, x_off=x_off, y_off=y_off
@@ -121,7 +121,11 @@ class Inspector:
         
         try:
             while True:
-                frame, detections = self.process_frame()
+                result = self.process_frame()
+                if result is None:
+                    continue
+
+                frame, detections = result
                 
                 if frame is not None:
                     cv2.imshow("PCB Inspector - Manual Control", frame)
