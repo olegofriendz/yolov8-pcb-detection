@@ -70,3 +70,6 @@ class MotionContoller:
 
         self.send("G90")
         self.send("G1 X0 Y0 F1000")
+
+    def set_home(self):
+        self.send("G92 X0 Y0")

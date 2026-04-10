@@ -143,7 +143,7 @@ class RKNNdetect:
                                     'box': det['box'], 'score': det['score']})
         
         self.history = new_history
-        stable = [h for h in self.history if h['count'] >= self.stable_frames] # объекты, накопившие достаточно кадров stab;e_frames
+        stable = [h for h in self.history if h['count'] >= self.stable_frames] # объекты, накопившие достаточно кадров stable_frames
         return [{'box': h['box'], 'class': h['class'], 'score': h['score']} for h in stable] # формат детекций
     
 

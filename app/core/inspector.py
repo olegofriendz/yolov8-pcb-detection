@@ -34,15 +34,14 @@ class Inspector:
         self.camera = CameraCapture(camera_id=self.CAMERA_ID, width=self.FRAME_WIDTH, height=self.FRAME_HEIGHT)
         print(f"\nКамера {self.CAMERA_ID} запущена ({self.FRAME_WIDTH}x{self.FRAME_HEIGHT}).")
 
-        print("\n[2/3] Загрузка модели детекции...")
+        print("\n[2/3] Загрузка модели детекции...\n")
         self.detector = RKNNdetect(model_path=model_path, img_size=640, conf_thres=self.CONF_THRES, 
                                    nms_thres=self.NMS_THRES, num_classes=self.NUM_CLASSES, class_names=self.CLASS_NAMES)
         self.detector.load_rknn_model()
 
-        print("\n[3/3] Подключение к контроллеру движения...")
+        print("\n[3/3] Подключение к контроллеру движения...\n")
         self.motion = MotionContoller(port=self.COM_PORT, baud=self.BAUD_RATE)
         self.motion.connect()
-        print(f"Контроллер на {self.COM_PORT} подключён")
 
         self.total_detections = 0
 
@@ -108,9 +107,7 @@ class Inspector:
 
     def manual_control(self):
 
-        print("=" * 50)
-        print("Управление: Стрелки - движение | H - home | Q - выход")
-        print("=" * 50 + "\n")
+        print("\nУправление: Стрелки - движение | H - home | Q - выход")
         
         self.motion.send("G91")
         
@@ -141,6 +138,16 @@ class Inspector:
                     self.motion.move_relative(y=-self.STEP_MM)
                 elif key == 83:   # Вправо
                     self.motion.move_relative(y=self.STEP_MM)
+
+                elif key == ord('s'):
+                    components = self.get_components_in_crop()
+                    print(f"\nНайдено компонентов: {len(components)}")
+                    for comp in components:
+                        print(f"  {comp['class_name']}: центр {comp['center']}, координаты {comp['bbox']}")
+
+                elif key == ord('z'):
+                    self.motion.set_home() # задать начало координат
+                
                     
         except KeyboardInterrupt:
             print("\nПрервано пользователем")
@@ -148,9 +155,44 @@ class Inspector:
             self.motion.send("G90")
 
 
+    # получить данные всех элементов на плате
+    def get_components_in_crop(self):
+        ret, frame = self.camera.read()
+        if not ret or frame is None:
+            return []
+
+        h, w = frame.shape[:2]
+        x_off = (w - self.detector.img_size) // 2
+        y_off = (h - self.detector.img_size) // 2
+        
+        crop_frame = frame[y_off:y_off+640, x_off:x_off+640]
+        img_input = self.detector.preprocess(crop_frame)
+        outputs = self.detector.rknn.inference(inputs=[img_input], data_format='nchw')
+        
+        raw_detections = self.detector.postprocess(outputs, 0, 0, (640, 640))
+        
+        components = []
+        for det in raw_detections:
+            box = det['box']  # [x1, y1, x2, y2] в координатах кропа
+            cx = (box[0] + box[2]) / 2
+            cy = (box[1] + box[3]) / 2
+            
+            components.append({
+                'class_name': self.CLASS_NAMES[det['class']],
+                'class_id': det['class'],
+                'bbox': box.tolist(),  # [x1, y1, x2, y2]
+                'center': [cx, cy],    # [center_x, center_y]
+                'confidence': det['score']
+            })
+        
+        return components
+        
+
+
+
     # завершить работу
     def shutdown(self):
-        print("\nЗавершение работы системы...")
+        print("Завершение работы системы...")
         self.camera.release()
         self.detector.release()
         self.motion.disconnect()
