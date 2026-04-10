@@ -21,7 +21,7 @@ class Inspector:
     COM_PORT = "/dev/ttyUSB0"
     BAUD_RATE = 115200
     
-    CONF_THRES = 0.6
+    CONF_THRES = 0.65
     NMS_THRES = 0.4
     NUM_CLASSES = 5
     CLASS_NAMES = ['chip-capacitor', 'chip-resistor', 'diode', 'ic', 'transistor']
@@ -96,11 +96,6 @@ class Inspector:
 
         cv2.rectangle(frame, (x_off, y_off), (x_off + 640, y_off + 640), (0, 255, 0), 1)
     
-        # center_x = x_off + 320
-        # center_y = y_off + 320
-        # cv2.line(frame, (center_x - 20, center_y), (center_x + 20, center_y), (0, 255, 0), 1)
-        # cv2.line(frame, (center_x, center_y - 20), (center_x, center_y + 20), (0, 255, 0), 1)
-        
         info_lines = [f"Detections: {len(detections)}", "Q - quit | Arrows - move | H - home"]
         
         y_pos = 30

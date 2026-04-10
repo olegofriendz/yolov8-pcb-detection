@@ -17,7 +17,7 @@ class RKNNdetect:
         self.num_classes = num_classes
         self.class_names = class_names
         self.history = []
-        self.stable_frames = 3
+        self.stable_frames = 1
 
 
     def load_rknn_model(self, target_platform='rk3588'):
@@ -46,7 +46,6 @@ class RKNNdetect:
         return img_input
 
 
-    # сырой выход нейросети -> список детекций в координатах исходного кадра
     def postprocess(self, outputs, x_off, y_off, orig_shape):
         output = outputs[0][0].transpose(1, 0) # транспонирование тензора в необходимый формат
         boxes = output[:, :4]
@@ -68,46 +67,60 @@ class RKNNdetect:
         x2 = boxes[:, 0] + boxes[:, 2] / 2
         y2 = boxes[:, 1] + boxes[:, 3] / 2
         
-        detections = []
-        for i in range(len(boxes)):
-            
-            CROP_MARGIN = 1 # отступ от края
-            if (x1[i] <= CROP_MARGIN or
-                y1[i] <= CROP_MARGIN or
-                x2[i] >= self.img_size - CROP_MARGIN or
-                y2[i] >= self.img_size - CROP_MARGIN):
-                continue # отбрасываются объекты на краю кропа
-            
-            box_global = np.array([x1[i] + x_off, y1[i] + y_off, x2[i] + x_off, y2[i] + y_off]) # возвращаемся к координатам исходного кадра добавляя смещение
-            box_global[[0, 2]] = np.clip(box_global[[0, 2]], 0, orig_shape[1]) # orig_shape - размера исходного кадра
-            box_global[[1, 3]] = np.clip(box_global[[1, 3]], 0, orig_shape[0])
-            
-            detections.append({
-                'box': box_global,              # [x1, y1, x2, y2]
-                'class': int(class_ids[i]),     # номер класса
-                'score': float(class_scores[i]) # уверенность
-            })
+        MARGIN = 5 # отступ от края для удаления объектов
+        final_detections = []
         
-        if len(detections) > 1:
-            detections = self._filter_nested_boxes(detections) # фильтр вложенных боксов
+        for cls in range(self.num_classes):
+            cls_mask = class_ids == cls
+            if not np.any(cls_mask):
+                continue
+            
+            cls_x1 = x1[cls_mask]
+            cls_y1 = y1[cls_mask]
+            cls_x2 = x2[cls_mask]
+            cls_y2 = y2[cls_mask]
+            cls_scores = class_scores[cls_mask]
+            
+            # отбрасываем элементы на краях
+            valid_mask = (cls_x1 > MARGIN) & (cls_y1 > MARGIN) & \
+                         (cls_x2 < self.img_size - MARGIN) & (cls_y2 < self.img_size - MARGIN)
+            
+            if not np.any(valid_mask):
+                continue
+            
+            cls_x1 = cls_x1[valid_mask]
+            cls_y1 = cls_y1[valid_mask]
+            cls_x2 = cls_x2[valid_mask]
+            cls_y2 = cls_y2[valid_mask]
+            cls_scores = cls_scores[valid_mask]
+            
+            xywh = np.stack([
+                cls_x1,
+                cls_y1,
+                cls_x2 - cls_x1,
+                cls_y2 - cls_y1
+            ], axis=1) # формат [x, y, w, h] для cv2.dnn.NMSBoxes
+            
+            indices = cv2.dnn.NMSBoxes(xywh.tolist(), cls_scores.tolist(), self.conf_thres, self.nms_thres) # NMS
+            
+            if len(indices) > 0:
+                for idx in indices.flatten():
+                    box_global = np.array([
+                        cls_x1[idx] + x_off,
+                        cls_y1[idx] + y_off,
+                        cls_x2[idx] + x_off,
+                        cls_y2[idx] + y_off
+                    ])
+                    box_global[[0, 2]] = np.clip(box_global[[0, 2]], 0, orig_shape[1])
+                    box_global[[1, 3]] = np.clip(box_global[[1, 3]], 0, orig_shape[0])
+                    
+                    final_detections.append({
+                        'box': box_global,
+                        'class': cls,
+                        'score': float(cls_scores[idx])
+                    })
         
-        return detections
-    
-
-    # фильтр вложенных боксов (если бокс полностью лежит внутри другого бокса -> отбрасываем)
-    def _filter_nested_boxes(self, detections):
-        detections.sort(key=lambda x: x['score'], reverse=True)
-        keep = []
-        for det in detections:
-            is_inside = False
-            for kept in keep:
-                if (det['box'][0] >= kept['box'][0] and det['box'][1] >= kept['box'][1] and
-                    det['box'][2] <= kept['box'][2] and det['box'][3] <= kept['box'][3]):
-                    is_inside = True
-                    break
-            if not is_inside:
-                keep.append(det)
-        return keep
+        return final_detections
 
 
     def stabilize(self, detections):
@@ -145,6 +158,7 @@ class RKNNdetect:
         crop_frame = frame[y_off:y_off+self.img_size, x_off:x_off+self.img_size]
         img_input = self.preprocess(crop_frame)
         outputs = self.rknn.inference(inputs=[img_input], data_format='nchw')
+
         detections = self.postprocess(outputs, x_off, y_off, (h, w))
         stable_detections = self.stabilize(detections)
         
@@ -154,6 +168,3 @@ class RKNNdetect:
     def release(self):
         if hasattr(self, 'rknn'):
             self.rknn.release()
-
-
-
