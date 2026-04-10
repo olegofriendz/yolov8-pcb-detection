@@ -70,8 +70,13 @@ class RKNNdetect:
         
         detections = []
         for i in range(len(boxes)):
-            if x1[i] <= 0 or y1[i] <= 0 or x2[i] >= self.img_size or y2[i] >= self.img_size: # отбрасываются объекты на краю кропа
-                continue
+            
+            CROP_MARGIN = 1 # отступ от края
+            if (x1[i] <= CROP_MARGIN or
+                y1[i] <= CROP_MARGIN or
+                x2[i] >= self.img_size - CROP_MARGIN or
+                y2[i] >= self.img_size - CROP_MARGIN):
+                continue # отбрасываются объекты на краю кропа
             
             box_global = np.array([x1[i] + x_off, y1[i] + y_off, x2[i] + x_off, y2[i] + y_off]) # возвращаемся к координатам исходного кадра добавляя смещение
             box_global[[0, 2]] = np.clip(box_global[[0, 2]], 0, orig_shape[1]) # orig_shape - размера исходного кадра
