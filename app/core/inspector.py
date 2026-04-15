@@ -26,7 +26,14 @@ class Inspector:
     NUM_CLASSES = 5
     CLASS_NAMES = ['chip-capacitor', 'chip-resistor', 'diode', 'ic', 'transistor']
     
-    STEP_MM = 3.0 # шаг для ручного управления
+    STEP_MM = 4.0 # шаг для ручного управления
+
+    PX_PER_MM = 10.0 # количество пикселей в мм
+    CROP_SIZE_MM = 640 / PX_PER_MM # размер кропа в мм
+
+    PLATE_WIDTH = 200 # мм
+    PLATE_HEIGHT = 200
+    OVERLAP_PERCENT = 40 # перекрытие в процентах
 
 
     def __init__(self, model_path=None):
@@ -104,10 +111,9 @@ class Inspector:
         
         return frame
     
-
+    # ручное управление камерой
     def manual_control(self):
-
-        print("\nУправление: Стрелки - движение | H - home | Q - выход")
+        print("\nУправление: Стрелки - движение | Z - задать начало координат | H - идти в (0, 0) | S - список объектов | Q - выход")
         
         self.motion.send("G91")
         
@@ -146,14 +152,86 @@ class Inspector:
                         print(f"  {comp['class_name']}: центр {comp['center']}, координаты {comp['bbox']}")
 
                 elif key == ord('z'):
-                    self.motion.set_home() # задать начало координат
-                
-                    
+                    self.motion.set_home() # задать начало координат           
         except KeyboardInterrupt:
             print("\nПрервано пользователем")
         finally:
             self.motion.send("G90")
 
+    # автоматический проход платы змейкой
+    def scan_plate(self):
+        points = self.generate_snake_points(plate_width=self.PLATE_WIDTH, plate_height=self.PLATE_HEIGHT, crop_size=self.CROP_SIZE_MM, overlap_percent=self.OVERLAP_PERCENT)
+        print(f"Всего точек: {len(points)}")
+
+        self.motion.set_home()
+        for x, y in points:
+            print(f"Движение в ({x:.1f}, {y:.1f})")
+            self.motion.move_absolute(x, y, feedrate=2000)
+
+            self.motion.wait_for_stop(show_live_callback=self.show_live_frame) # ожидание остановки через "?"
+
+            frame, _ = self.process_frame()
+            if frame is not None:
+                cv2.imshow("PCB Inspector - Scanning", frame)
+                cv2.waitKey(1)
+
+        print("Сканирование завершено.")
+        self.motion.home()
+
+    def show_live_frame(self):
+        frame, _ = self.process_frame()
+        if frame is not None:
+            cv2.imshow("PCB Inspector - Scanning", frame)
+            cv2.waitKey(1)
+
+    # получить список координат для прохода
+    def generate_snake_points(self, plate_width, plate_height, crop_size=64, overlap_percent=20):
+        step = crop_size * (1 - overlap_percent / 100)
+        
+        points = []
+        y = 0.0
+        direction = 1  # 1 = вправо, -1 = влево
+        
+        while y < plate_height:
+            if direction == 1:
+                x = 0.0
+                while x < plate_width:
+                    points.append((x, y))
+                    x += step
+                if points[-1][0] < plate_width:
+                    points.append((plate_width, y))
+            else:
+                x = plate_width
+                while x > 0:
+                    points.append((x, y))
+                    x -= step
+                if points[-1][0] > 0:
+                    points.append((0, y))
+            
+            y += step
+            direction *= -1  # смена направления
+        
+        if points[-1][1] < plate_height:
+            # Добавляем строку по нижнему краю
+            y = plate_height
+            if direction == 1:
+                # Последняя строка была справа налево, значит сейчас едем слева направо
+                x = 0.0
+                while x <= plate_width:
+                    points.append((x, y))
+                    x += step
+                if points[-1][0] < plate_width:
+                    points.append((plate_width, y))
+            else:
+                # Последняя строка была слева направо, значит сейчас едем справа налево
+                x = plate_width
+                while x >= 0:
+                    points.append((x, y))
+                    x -= step
+                if points[-1][0] > 0:
+                    points.append((0, y))
+                
+        return points
 
     # получить данные всех элементов на плате
     def get_components_in_crop(self):
@@ -187,9 +265,6 @@ class Inspector:
         
         return components
         
-
-
-
     # завершить работу
     def shutdown(self):
         print("Завершение работы системы...")

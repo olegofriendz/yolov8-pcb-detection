@@ -34,7 +34,7 @@ class MotionContoller:
             return ""
 
         self.ser.write(f"{cmd}\n".encode())
-        responce = ""
+        response = ""
         while True:
             line = self.ser.readline().decode().strip()
             if not line:
@@ -61,6 +61,20 @@ class MotionContoller:
         self.send("G90")
         responce = self.send(f"G1 X{x} Y{y} F{feedrate}")
         return responce
+    
+    # ожидание остановки
+    def wait_for_stop(self, show_live_callback=None):
+        while True:
+            self.ser.write(b"?")
+            response = self.ser.readline().decode().strip()
+            
+            if "<Idle" in response:
+                break
+
+            if show_live_callback:
+                show_live_callback()
+
+            time.sleep(3)
     
 
     def home(self):

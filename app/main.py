@@ -3,7 +3,8 @@ from core.inspector import Inspector
 def main():
     inspector = Inspector()
     try:
-        inspector.manual_control()
+        # inspector.manual_control()
+        inspector.scan_plate()
     finally:
         inspector.shutdown()
 
