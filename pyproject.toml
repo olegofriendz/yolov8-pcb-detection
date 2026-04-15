@@ -14,7 +14,8 @@ dependencies = [
     "roboflow",
     "ultralytics",
     "python-dotenv",
-    "pyyaml"
+    "pyyaml",
+    "pyserial"
 ]
 
 [tool.setuptools.packages.find]
