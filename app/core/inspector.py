@@ -3,6 +3,7 @@ import time
 import numpy as np
 from pathlib import Path
 import sys
+from threading import Thread
 
 from hardware.camera import CameraCapture
 from hardware.motion import MotionContoller
@@ -51,12 +52,24 @@ class Inspector:
         self.motion.connect()
 
         self.total_detections = 0
+        self.current_frame = None # для gui
+        self.current_detections = []
 
+        self.running = True
+        self.processing_thread = Thread(target=self._process_loop, daemon=True)
+        self.processing_thread.start()
+
+    # поток для постоянной обработки кадров
+    def _process_loop(self):
+        while self.running:
+            self.process_frame()
+            time.sleep(0.05)
 
     # обработка кадра: захват -> детекция -> отрисовка
     def process_frame(self, x_off=None, y_off=None):
         ret, frame = self.camera.read()
         if not ret or frame is None:
+            self.current_frame = None
             return None, []
         
         detections, crop_frame, (x_off_actual, y_off_actual) = self.detector.detect(
@@ -65,6 +78,9 @@ class Inspector:
         
         frame_with_boxes = self.draw_detections(frame, detections)
         frame_with_boxes = self.draw_info(frame_with_boxes, detections, x_off_actual, y_off_actual)
+
+        self.current_frame = frame_with_boxes
+        self.current_detections = detections
         
         return frame_with_boxes, detections
     
@@ -111,54 +127,25 @@ class Inspector:
         
         return frame
     
+    
     # ручное управление камерой
-    def manual_control(self):
-        print("\nУправление: Стрелки - движение | Z - задать начало координат | H - идти в (0, 0) | S - список объектов | Q - выход")
+    def manual_control_step(self, direction=None):
+        if direction == 'up':
+            self.motion.move_relative(x=-self.STEP_MM)
+        elif direction == 'down':
+            self.motion.move_relative(x=self.STEP_MM)
+        elif direction == 'left':
+            self.motion.move_relative(y=-self.STEP_MM)
+        elif direction == 'right':
+            self.motion.move_relative(y=self.STEP_MM)
+        elif direction == 'home':
+            self.motion.home()
+        elif direction == 'set_home':
+            self.motion.set_home()
         
-        self.motion.send("G91")
-        
-        try:
-            while True:
-                result = self.process_frame()
-                if result is None:
-                    continue
+        # self.process_frame()
 
-                frame, detections = result
-                
-                if frame is not None:
-                    cv2.imshow("PCB Inspector - Manual Control", frame)
-                
-                key = cv2.waitKey(1) & 0xFF
-                
-                if key == ord('q'):
-                    print("\nВыход из ручного режима...")
-                    break
-                elif key == ord('h'):
-                    print("Парковка (G28)...")
-                    self.motion.home()
-                elif key == 82:   # Вверх
-                    self.motion.move_relative(x=-self.STEP_MM)
-                elif key == 84:   # Вниз
-                    self.motion.move_relative(x=self.STEP_MM)
-                elif key == 81:   # Влево
-                    self.motion.move_relative(y=-self.STEP_MM)
-                elif key == 83:   # Вправо
-                    self.motion.move_relative(y=self.STEP_MM)
-
-                elif key == ord('s'):
-                    components = self.get_components_in_crop()
-                    print(f"\nНайдено компонентов: {len(components)}")
-                    for comp in components:
-                        print(f"  {comp['class_name']}: центр {comp['center']}, координаты {comp['bbox']}")
-
-                elif key == ord('z'):
-                    self.motion.set_home() # задать начало координат           
-        except KeyboardInterrupt:
-            print("\nПрервано пользователем")
-        finally:
-            self.motion.send("G90")
-
-    # автоматический проход платы змейкой
+    # автоматический проход платы
     def scan_plate(self):
         points = self.generate_snake_points(plate_width=self.PLATE_WIDTH, plate_height=self.PLATE_HEIGHT, crop_size=self.CROP_SIZE_MM, overlap_percent=self.OVERLAP_PERCENT)
         print(f"Всего точек: {len(points)}")
@@ -167,22 +154,16 @@ class Inspector:
         for x, y in points:
             print(f"Движение в ({x:.1f}, {y:.1f})")
             self.motion.move_absolute(x, y, feedrate=2000)
-
-            self.motion.wait_for_stop(show_live_callback=self.show_live_frame) # ожидание остановки через "?"
-
-            frame, _ = self.process_frame()
-            if frame is not None:
-                cv2.imshow("PCB Inspector - Scanning", frame)
-                cv2.waitKey(1)
+            self.motion.wait_for_stop(show_live_callback=self.update_live_frame)
+            
+            # self.process_frame()
 
         print("Сканирование завершено.")
         self.motion.home()
 
-    def show_live_frame(self):
-        frame, _ = self.process_frame()
-        if frame is not None:
-            cv2.imshow("PCB Inspector - Scanning", frame)
-            cv2.waitKey(1)
+    def update_live_frame(self):
+        # self.process_frame()
+        pass
 
     # получить список координат для прохода
     def generate_snake_points(self, plate_width, plate_height, crop_size=64, overlap_percent=20):
@@ -264,10 +245,19 @@ class Inspector:
             })
         
         return components
-        
+    
+    # получить последний кадр для gui
+    def get_current_frame(self):
+        return self.current_frame
+
     # завершить работу
     def shutdown(self):
         print("Завершение работы системы...")
+        self.running = False
+
+        if hasattr(self, 'processing_thread'):
+            self.processing_thread.join(timeout=1.0)
+
         self.camera.release()
         self.detector.release()
         self.motion.disconnect()

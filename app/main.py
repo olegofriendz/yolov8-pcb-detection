@@ -1,10 +1,11 @@
 from core.inspector import Inspector
+from gui.main_window import MainWindow
 
 def main():
     inspector = Inspector()
+    window = MainWindow(inspector)
     try:
-        # inspector.manual_control()
-        inspector.scan_plate()
+        window.run()
     finally:
         inspector.shutdown()
 
