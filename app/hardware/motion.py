@@ -16,6 +16,8 @@ class MotionContoller:
             time.sleep(2)
             print(f"Контроллер {self.port} подключен.")
             self.connected = True
+            self.ser.write(b"~\n")
+            
         except:
             print(f"Контроллер {self.port} не найден. Управление отключено.")
             self.ser = None
@@ -76,7 +78,7 @@ class MotionContoller:
 
             time.sleep(3)
     
-
+    # вернуться в созданный ноль
     def home(self):
         if not self.connected:
             print("Управление недоступно!")
@@ -85,5 +87,10 @@ class MotionContoller:
         self.send("G90")
         self.send("G1 X0 Y0 F1000")
 
+    # создать ноль
     def set_home(self):
         self.send("G92 X0 Y0")
+
+    # вернуться в системные нули (замыкание концевиков)
+    def go_zero(self):
+        self.send("$H")
