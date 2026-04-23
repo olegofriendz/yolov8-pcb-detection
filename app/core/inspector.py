@@ -1,9 +1,11 @@
 import cv2
 import time
+import json
 import numpy as np
 from pathlib import Path
 import sys
 from threading import Thread
+from datetime import datetime
 
 from hardware.camera import CameraCapture
 from hardware.motion import MotionContoller
@@ -16,26 +18,25 @@ sys.path.insert(0, str(project_root))
 class Inspector:
 
     CAMERA_ID = 0
-    FRAME_WIDTH = 3840
-    FRAME_HEIGHT = 2160
+    FRAME_WIDTH = 1920
+    FRAME_HEIGHT = 1080
     
     COM_PORT = "/dev/ttyUSB0"
     BAUD_RATE = 115200
     
     CONF_THRES = 0.65
-    NMS_THRES = 0.4
+    NMS_THRES = 0.8
     NUM_CLASSES = 5
     CLASS_NAMES = ['chip-capacitor', 'chip-resistor', 'diode', 'ic', 'transistor']
     
     STEP_MM = 4.0 # шаг для ручного управления
 
-    PX_PER_MM = 10.0 # количество пикселей в мм
-    CROP_SIZE_MM = 640 / PX_PER_MM # размер кропа в мм
+    CROP_SIZE_MM = 75.0 # размер кропа в мм
+    PX_PER_MM = 640 / CROP_SIZE_MM # количество пикселей в мм
 
     PLATE_WIDTH = 200 # мм
     PLATE_HEIGHT = 200
     OVERLAP_PERCENT = 40 # перекрытие в процентах
-
 
     def __init__(self, model_path=None):
         print("\n[1/3] Запуск камеры...")
@@ -59,6 +60,8 @@ class Inspector:
         self.processing_thread = Thread(target=self._process_loop, daemon=True)
         self.processing_thread.start()
 
+        self.crop_offset = (0, 0)
+
     # поток для постоянной обработки кадров
     def _process_loop(self):
         while self.running:
@@ -72,10 +75,18 @@ class Inspector:
             self.current_frame = None
             return None, []
         
+        h, w = frame.shape[:2]
+        if x_off is None:
+            x_off = (w - 640) // 2
+        if y_off is None:
+            y_off = (h - 640) // 2
+
         detections, crop_frame, (x_off_actual, y_off_actual) = self.detector.detect(
             frame, x_off=x_off, y_off=y_off
         )
         
+        self.crop_offset = (x_off_actual, y_off_actual) # смещение для пересчёта координат
+
         frame_with_boxes = self.draw_detections(frame, detections)
         frame_with_boxes = self.draw_info(frame_with_boxes, detections, x_off_actual, y_off_actual)
 
@@ -108,17 +119,13 @@ class Inspector:
             
             (label_w, label_h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
             cv2.rectangle(frame, (x1, y1 - label_h - 5), (x1 + label_w, y1), color, -1)
-            cv2.putText(frame, label, (x1, y1 - 5), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            cv2.putText(frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
         
         return frame
     
-
     def draw_info(self, frame, detections, x_off, y_off):
-
         cv2.rectangle(frame, (x_off, y_off), (x_off + 640, y_off + 640), (0, 255, 0), 1)
-    
-        info_lines = [f"Detections: {len(detections)}", "Q - quit | Arrows - move | H - home"]
+        info_lines = [f"Detections: {len(detections)}", "Arrows - move", "Z - set home", "H - go home"]
         
         y_pos = 30
         for line in info_lines:
@@ -126,7 +133,6 @@ class Inspector:
             y_pos += 25
         
         return frame
-    
     
     # ручное управление камерой
     def manual_control_step(self, direction=None):
@@ -142,32 +148,39 @@ class Inspector:
             self.motion.home()
         elif direction == 'set_home':
             self.motion.set_home()
-        
-        # self.process_frame()
 
     # автоматический проход платы
     def scan_plate(self):
-        points = self.generate_snake_points(plate_width=self.PLATE_WIDTH, plate_height=self.PLATE_HEIGHT, crop_size=self.CROP_SIZE_MM, overlap_percent=self.OVERLAP_PERCENT)
+        points = self.generate_snake_points(plate_width=self.PLATE_WIDTH,
+                                            plate_height=self.PLATE_HEIGHT,
+                                            crop_size=self.CROP_SIZE_MM,
+                                            overlap_percent=self.OVERLAP_PERCENT)
         print(f"Всего точек: {len(points)}")
 
-        self.motion.set_home()
-        for x, y in points:
-            print(f"Движение в ({x:.1f}, {y:.1f})")
+        all_components = []
+
+        self.motion.go_zero()
+        self.motion.move_relative(100, 100)
+        self.motion.set_home() # установить дом в левом верхнем углы платы
+
+        for i, (x, y) in enumerate(points):
+            print(f"[{i+1}/{len(points)}] Движение в ({x:.1f}, {y:.1f})")
             self.motion.move_absolute(x, y, feedrate=2000)
-            self.motion.wait_for_stop(show_live_callback=self.update_live_frame)
-            
-            # self.process_frame()
+            self.motion.wait_for_stop()
+            time.sleep(2)
 
-        print("Сканирование завершено.")
+            components = self.scan_at_position(x, y)
+            all_components.extend(components)
+
+        print(f"Всего компонентов найдено: {len(all_components)}")
+        self.save_results(all_components)
+        print(f"Сканирование завершено.")
         self.motion.home()
+        # self.motion.go_zero()
 
-    def update_live_frame(self):
-        # self.process_frame()
-        pass
-
-    # получить список координат для прохода
-    def generate_snake_points(self, plate_width, plate_height, crop_size=64, overlap_percent=20):
-        step = crop_size * (1 - overlap_percent / 100)
+    # получить список координат для прохода "змейкой"
+    def generate_snake_points(self, plate_width, plate_height, crop_size_mm, overlap_percent):
+        step = crop_size_mm * (1 - overlap_percent / 100) # шаг в мм = размер кропа в мм * (1 - перекрытие)
         
         points = []
         y = 0.0
@@ -193,10 +206,8 @@ class Inspector:
             direction *= -1  # смена направления
         
         if points[-1][1] < plate_height:
-            # Добавляем строку по нижнему краю
             y = plate_height
             if direction == 1:
-                # Последняя строка была справа налево, значит сейчас едем слева направо
                 x = 0.0
                 while x <= plate_width:
                     points.append((x, y))
@@ -204,7 +215,6 @@ class Inspector:
                 if points[-1][0] < plate_width:
                     points.append((plate_width, y))
             else:
-                # Последняя строка была слева направо, значит сейчас едем справа налево
                 x = plate_width
                 while x >= 0:
                     points.append((x, y))
@@ -214,38 +224,138 @@ class Inspector:
                 
         return points
 
-    # получить данные всех элементов на плате
-    def get_components_in_crop(self):
-        ret, frame = self.camera.read()
-        if not ret or frame is None:
-            return []
-
-        h, w = frame.shape[:2]
-        x_off = (w - self.detector.img_size) // 2
-        y_off = (h - self.detector.img_size) // 2
-        
-        crop_frame = frame[y_off:y_off+640, x_off:x_off+640]
-        img_input = self.detector.preprocess(crop_frame)
-        outputs = self.detector.rknn.inference(inputs=[img_input], data_format='nchw')
-        
-        raw_detections = self.detector.postprocess(outputs, 0, 0, (640, 640))
-        
+    # получить все элементы в кропе в мм
+    def scan_at_position(self, plate_x, plate_y):
+        x_off, y_off = self.crop_offset
         components = []
-        for det in raw_detections:
-            box = det['box']  # [x1, y1, x2, y2] в координатах кропа
-            cx = (box[0] + box[2]) / 2
-            cy = (box[1] + box[3]) / 2
+        for det in self.current_detections:
+            box = det['box']
+            
+            box_crop = [
+                round(box[0] - x_off, 4),
+                round(box[1] - y_off, 4),
+                round(box[2] - x_off, 4),
+                round(box[3] - y_off, 4)
+            ]
+            
+            cx = round((box_crop[0] + box_crop[2]) / 2, 4) # центр бокса ??????
+            cy = round((box_crop[1] + box_crop[3]) / 2, 4)
+            
+            cx_crop_mm = round((cx / 640) * self.CROP_SIZE_MM, 4)
+            cy_crop_mm = round((cy / 640) * self.CROP_SIZE_MM, 4)
+
+            global_x = round(plate_y + cx_crop_mm, 4)
+            global_y = round(plate_x + cy_crop_mm, 4)
             
             components.append({
                 'class_name': self.CLASS_NAMES[det['class']],
                 'class_id': det['class'],
-                'bbox': box.tolist(),  # [x1, y1, x2, y2]
-                'center': [cx, cy],    # [center_x, center_y]
-                'confidence': det['score']
+                'bbox_crop': box_crop,
+                'center_px': [cx, cy],
+                'center_mm': [global_x, global_y],
+                'confidence': round(det['score'], 4)
             })
         
         return components
+
+    # сохранить результаты в файл
+    def save_results(self, components, filename=None):
+        if filename is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"scan_results_{timestamp}.json"
+
+        results = {
+            'metadata': {
+                'plate_width': self.PLATE_WIDTH,
+                'plate_height': self.PLATE_HEIGHT,
+                'crop_size_mm': self.CROP_SIZE_MM,
+                'overlap_percent': self.OVERLAP_PERCENT,
+                'total_components': len(components),
+                'timestamp': datetime.now().isoformat()
+            },
+            'components': components
+        }
+
+        filepath = Path(__file__).parent.parent / "results" / filename
+        filepath.parent.mkdir(exist_ok=True)
+
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(results, f, indent=2, ensure_ascii=False)
+
+        print(f"Результаты сохранены в {filepath}.")
+        return str(filepath)
     
+    # удалить элементы которые встретились повторно
+    def remove_duplicate_components(self, components, distance_threshold_mm=3.0, iou_threshold=0.5):
+        if len(components) <= 1:
+            return components
+        
+        by_class = {}
+        for comp in components:
+            cls = comp['class_id']
+            if cls not in by_class:
+                by_class[cls] = []
+            by_class[cls].append(comp)
+        
+        unique = []
+        
+        for cls, items in by_class.items():
+            # сортировка по confidence
+            items = sorted(items, key=lambda x: x['confidence'], reverse=True)
+            used = set()
+            
+            for i, comp1 in enumerate(items):
+                if i in used:
+                    continue
+                
+                best = comp1
+                duplicates = [i]
+                
+                for j, comp2 in enumerate(items[i+1:], start=i+1):
+                    if j in used:
+                        continue
+                    
+                    # расстояние
+                    dx = abs(comp1['center_mm'][0] - comp2['center_mm'][0])
+                    dy = abs(comp1['center_mm'][1] - comp2['center_mm'][1])
+                    distance = (dx**2 + dy**2)**0.5
+                    
+                    if distance > distance_threshold_mm:
+                        continue
+                    
+                    # перекрытие прямоугольников
+                    iou = self.compute_iou(comp1['bbox_crop'], comp2['bbox_crop'])
+                    
+                    if iou >= iou_threshold:
+                        duplicates.append(j)
+                        if comp2['confidence'] > best['confidence']:
+                            best = comp2
+                
+                # добавление лучшего
+                unique.append(best)
+                for idx in duplicates:
+                    used.add(idx)
+        
+        return unique
+        
+    # получить iou боксов    
+    def compute_iou(self, box1, box2):
+        x1 = max(box1[0], box2[0])
+        y1 = max(box1[1], box2[1])
+        x2 = min(box1[2], box2[2])
+        y2 = min(box1[3], box2[3])
+        
+        if x2 <= x1 or y2 <= y1:
+            return 0.0
+        
+        intersection = (x2 - x1) * (y2 - y1)
+        area1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
+        area2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
+        union = area1 + area2 - intersection
+        
+        return intersection / union if union > 0 else 0.0
+
+
     # получить последний кадр для gui
     def get_current_frame(self):
         return self.current_frame

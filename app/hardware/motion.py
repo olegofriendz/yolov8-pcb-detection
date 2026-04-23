@@ -9,7 +9,6 @@ class MotionContoller:
         self.ser = None
         self.connected = False
 
-
     def connect(self):
         try:
             self.ser = serial.Serial(self.port, self.baud, timeout=1)
@@ -23,12 +22,10 @@ class MotionContoller:
             self.ser = None
             self.connected = False
 
-
     def disconnect(self):
         if self.ser and self.ser.is_open and self.connected:
             self.send("G90")
             self.ser.close()
-
 
     # отправить g-код и получить ответ
     def send(self, cmd: str) -> str:
@@ -46,7 +43,6 @@ class MotionContoller:
                 break
         return response
     
-
     def move_relative(self, x=0, y=0, feedrate=1000) -> str:
         if not self.connected:
             return ""
@@ -55,7 +51,6 @@ class MotionContoller:
         responce = self.send(f"G1 X{x} Y{y} F{feedrate}")
         return responce
     
-
     def move_absolute(self, x, y, feedrate=1000) -> str:
         if not self.connected:
             return ""
@@ -65,16 +60,13 @@ class MotionContoller:
         return responce
     
     # ожидание остановки
-    def wait_for_stop(self, show_live_callback=None):
+    def wait_for_stop(self):
         while True:
-            self.ser.write(b"?")
-            response = self.ser.readline().decode().strip()
+            self.ser.write(b"?") # запрос статуса у устройства
+            response = self.ser.readline().decode().strip() # ответ от порта (-> str)
             
             if "<Idle" in response:
-                break
-
-            if show_live_callback:
-                show_live_callback()
+                break 
 
             time.sleep(3)
     
