@@ -31,8 +31,9 @@ class Inspector:
     
     STEP_MM = 4.0 # шаг для ручного управления
 
+    CROP_SIZE_PX = 640
     CROP_SIZE_MM = 75.0 # размер кропа в мм
-    PX_PER_MM = 640 / CROP_SIZE_MM # количество пикселей в мм
+    PX_PER_MM = CROP_SIZE_PX / CROP_SIZE_MM # количество пикселей в мм
 
     PLATE_WIDTH = 200 # мм
     PLATE_HEIGHT = 200
@@ -44,8 +45,12 @@ class Inspector:
         print(f"\nКамера {self.CAMERA_ID} запущена ({self.FRAME_WIDTH}x{self.FRAME_HEIGHT}).")
 
         print("\n[2/3] Загрузка модели детекции...\n")
-        self.detector = RKNNdetect(model_path=model_path, img_size=640, conf_thres=self.CONF_THRES, 
-                                   nms_thres=self.NMS_THRES, num_classes=self.NUM_CLASSES, class_names=self.CLASS_NAMES)
+        self.detector = RKNNdetect(model_path=model_path, 
+                                   img_size=self.CROP_SIZE_PX, 
+                                   conf_thres=self.CONF_THRES, 
+                                   nms_thres=self.NMS_THRES, 
+                                   num_classes=self.NUM_CLASSES, 
+                                   class_names=self.CLASS_NAMES)
         self.detector.load_rknn_model()
 
         print("\n[3/3] Подключение к контроллеру движения...\n")
@@ -60,7 +65,7 @@ class Inspector:
         self.processing_thread = Thread(target=self._process_loop, daemon=True)
         self.processing_thread.start()
 
-        self.crop_offset = (0, 0)
+        self.crop_offset = ((self.FRAME_WIDTH - self.CROP_SIZE_PX) // 2, (self.FRAME_HEIGHT - self.CROP_SIZE_PX) // 2)
 
     # поток для постоянной обработки кадров
     def _process_loop(self):
@@ -68,7 +73,7 @@ class Inspector:
             self.process_frame()
             time.sleep(0.05)
 
-    # обработка кадра: захват -> детекция -> отрисовка
+    # обработка кадра
     def process_frame(self, x_off=None, y_off=None):
         ret, frame = self.camera.read()
         if not ret or frame is None:
@@ -77,16 +82,14 @@ class Inspector:
         
         h, w = frame.shape[:2]
         if x_off is None:
-            x_off = (w - 640) // 2
+            x_off = (w - self.CROP_SIZE_PX) // 2 # ????????????????
         if y_off is None:
-            y_off = (h - 640) // 2
+            y_off = (h - self.CROP_SIZE_PX) // 2
 
         detections, crop_frame, (x_off_actual, y_off_actual) = self.detector.detect(
             frame, x_off=x_off, y_off=y_off
         )
         
-        self.crop_offset = (x_off_actual, y_off_actual) # смещение для пересчёта координат
-
         frame_with_boxes = self.draw_detections(frame, detections)
         frame_with_boxes = self.draw_info(frame_with_boxes, detections, x_off_actual, y_off_actual)
 
@@ -124,7 +127,7 @@ class Inspector:
         return frame
     
     def draw_info(self, frame, detections, x_off, y_off):
-        cv2.rectangle(frame, (x_off, y_off), (x_off + 640, y_off + 640), (0, 255, 0), 1)
+        cv2.rectangle(frame, (x_off, y_off), (x_off + self.CROP_SIZE_PX, y_off + self.CROP_SIZE_PX), (0, 255, 0), 1)
         info_lines = [f"Detections: {len(detections)}", "Arrows - move", "Z - set home", "H - go home"]
         
         y_pos = 30
@@ -179,7 +182,7 @@ class Inspector:
         # self.motion.go_zero()
 
     # получить список координат для прохода "змейкой"
-    def generate_snake_points(self, plate_width, plate_height, crop_size_mm, overlap_percent):
+    def generate_snake_points(self, plate_width, plate_height, crop_size_mm, overlap_percent) -> list:
         step = crop_size_mm * (1 - overlap_percent / 100) # шаг в мм = размер кропа в мм * (1 - перекрытие)
         
         points = []
@@ -241,8 +244,8 @@ class Inspector:
             cx = round((box_crop[0] + box_crop[2]) / 2, 4) # центр бокса ??????
             cy = round((box_crop[1] + box_crop[3]) / 2, 4)
             
-            cx_crop_mm = round((cx / 640) * self.CROP_SIZE_MM, 4)
-            cy_crop_mm = round((cy / 640) * self.CROP_SIZE_MM, 4)
+            cx_crop_mm = round((cx / self.CROP_SIZE_PX) * self.CROP_SIZE_MM, 4)
+            cy_crop_mm = round((cy / self.CROP_SIZE_PX) * self.CROP_SIZE_MM, 4)
 
             global_x = round(plate_y + cx_crop_mm, 4)
             global_y = round(plate_x + cy_crop_mm, 4)
