@@ -13,16 +13,37 @@ class MainWindow:
 
         self.root = tk.Tk()
         self.root.title("PCB Inspector")
-        self.root.geometry("1920x1080")
 
-        btn_frame = tk.Frame(self.root)
-        btn_frame.pack(pady=10)
-        self.btn_manual = tk.Button(btn_frame, text='Ручной', command=self.start_manual)
-        self.btn_auto = tk.Button(btn_frame, text='Авто', command=self.start_auto)
+        top_frame = tk.Frame(self.root)
+        top_frame.pack(pady=10)
+
+        # кнопки
+        btn_frame = tk.Frame(top_frame)
+        btn_frame.pack(side=tk.LEFT, padx=10)
+        self.btn_manual = tk.Button(btn_frame, text='Ручное управление', command=self.start_manual)
+        self.btn_standard = tk.Button(btn_frame, text="Эталон", command=self.scan_standard)
+        self.btn_auto = tk.Button(btn_frame, text='Проверить', command=self.start_auto)
         self.btn_manual.pack(side=tk.LEFT, padx=10)
+        self.btn_standard.pack(side=tk.LEFT, padx=10)
         self.btn_auto.pack(side=tk.LEFT, padx=10)
         
+        # поля для ввода width, height
+        size_frame = tk.Frame(top_frame)
+        size_frame.pack(side=tk.LEFT, padx=20)
 
+        tk.Label(size_frame, text="Ширина платы (мм):").pack(side=tk.LEFT, padx=5)
+        self.plate_width_entry = tk.Entry(size_frame, width=10)
+        self.plate_width_entry.pack(side=tk.LEFT, padx=5)
+        self.plate_width_entry.insert(0, str(self.inspector.PLATE_WIDTH))
+
+        tk.Label(size_frame, text="Высота платы (мм):").pack(side=tk.LEFT, padx=5)
+        self.plate_height_entry = tk.Entry(size_frame, width=10)
+        self.plate_height_entry.pack(side=tk.LEFT, padx=5)
+        self.plate_height_entry.insert(0, str(self.inspector.PLATE_HEIGHT))
+
+        tk.Button(size_frame, text="Применить", command=self.apply_plate_size).pack(side=tk.LEFT, padx=10)
+
+        # текст
         self.status = tk.Label(self.root, text="Готов", fg="green", font=("Arial", 12))
         self.status.pack(pady=5)
 
@@ -33,21 +54,24 @@ class MainWindow:
 
         self.update_display()
 
-        # *** добавить поля для введения размера платы ***
+        # *** добавить поля для введения размера платы *** (+)
         # *** добавить кнопку для проверки эталона ***
 
     def start_manual(self):
-        self.mode = 'manual'
-        self.btn_manual.config(state=tk.DISABLED)
-        self.btn_auto.config(state=tk.NORMAL)
-        self.status.config(text="Ручной режим (Q - выход)", fg="blue")
-        self.inspector.motion.send("G91")
-        # self.inspector.process_frame()  # первый кадр
+        if self.mode == "manual":
+            self.stop_manual()
+        else:         
+            self.mode = 'manual'
+            self.btn_manual.config(text="Ручное управление", relief=tk.SUNKEN)
+            self.btn_auto.config(state=tk.DISABLED)
+            self.status.config(text="Ручной режим", fg="blue")
+            self.inspector.motion.send("G91")
 
     def stop_manual(self):
         self.mode = None
-        self.btn_manual.config(state=tk.NORMAL)
-        self.status.config(text="Ручной режим завершён", fg="green")
+        self.btn_manual.config(text="Ручное управление", relief=tk.RAISED)
+        self.btn_auto.config(state=tk.NORMAL)
+        self.status.config(text="Ручной режим отключен", fg="green")
         self.inspector.motion.send("G90")
 
     def start_auto(self):
@@ -58,14 +82,18 @@ class MainWindow:
         
         def run_scan():
             self.inspector.scan_plate()
-            self.root.after(0, self.auto_finished)
+            self.root.after(0, self.stop_auto)
         
         Thread(target=run_scan, daemon=True).start() # отдельный поток 
     
-    def auto_finished(self):
+    def stop_auto(self):
         self.mode = None
         self.btn_auto.config(state=tk.NORMAL)
         self.status.config(text="Сканирование завершено", fg="green")
+
+    # сканировать эталонную плату
+    def scan_standard(self):
+        pass
 
     # кадр OpenCV -> изображение Tkinter
     def convert_frame_for_tkinter(self, opencv_frame):
@@ -111,6 +139,22 @@ class MainWindow:
             self.inspector.manual_control_step('set_home')
         elif key == 's':
             self.show_components()
+
+    def apply_plate_size(self):
+        try:
+            width = float(self.plate_width_entry.get())
+            height = float(self.plate_height_entry.get())
+
+            if width <= 0 or height <= 0:
+                raise ValueError("Размеры платы не могут быть отрицательными!")
+            
+            self.inspector.PLATE_WIDTH = width
+            self.inspector.PLATE_HEIGHT = height
+            self.status.config(text=f"Размер платы: {width} x {height} мм", fg="green")
+
+        except ValueError as e:
+            self.status.config(text=f"Ошибка: неверный ввод!", fg="red")
+
 
     
     def run(self):

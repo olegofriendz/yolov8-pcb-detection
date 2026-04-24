@@ -5,11 +5,12 @@ import threading
 class CameraCapture:
     def __init__(self, camera_id, width, height):
         self.cap = cv2.VideoCapture(camera_id)
+        self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
-        self.cap.set(cv2.CAP_PROP_EXPOSURE, 500)
+        self.cap.set(cv2.CAP_PROP_EXPOSURE, 600)
         self.frame = None
         self.lock = threading.Lock()
         self.running = True

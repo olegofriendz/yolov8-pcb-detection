@@ -65,8 +65,6 @@ class Inspector:
         self.processing_thread = Thread(target=self._process_loop, daemon=True)
         self.processing_thread.start()
 
-        self.crop_offset = ((self.FRAME_WIDTH - self.CROP_SIZE_PX) // 2, (self.FRAME_HEIGHT - self.CROP_SIZE_PX) // 2)
-
     # поток для постоянной обработки кадров
     def _process_loop(self):
         while self.running:
@@ -82,7 +80,7 @@ class Inspector:
         
         h, w = frame.shape[:2]
         if x_off is None:
-            x_off = (w - self.CROP_SIZE_PX) // 2 # ????????????????
+            x_off = (w - self.CROP_SIZE_PX) // 2
         if y_off is None:
             y_off = (h - self.CROP_SIZE_PX) // 2
 
@@ -156,14 +154,14 @@ class Inspector:
     def scan_plate(self):
         points = self.generate_snake_points(plate_width=self.PLATE_WIDTH,
                                             plate_height=self.PLATE_HEIGHT,
-                                            crop_size=self.CROP_SIZE_MM,
+                                            crop_size_mm=self.CROP_SIZE_MM,
                                             overlap_percent=self.OVERLAP_PERCENT)
         print(f"Всего точек: {len(points)}")
 
         all_components = []
 
         self.motion.go_zero()
-        self.motion.move_relative(100, 100)
+        self.motion.move_relative(100, 100, feedrate=2000)
         self.motion.set_home() # установить дом в левом верхнем углы платы
 
         for i, (x, y) in enumerate(points):
@@ -179,7 +177,6 @@ class Inspector:
         self.save_results(all_components)
         print(f"Сканирование завершено.")
         self.motion.home()
-        # self.motion.go_zero()
 
     # получить список координат для прохода "змейкой"
     def generate_snake_points(self, plate_width, plate_height, crop_size_mm, overlap_percent) -> list:
@@ -229,26 +226,26 @@ class Inspector:
 
     # получить все элементы в кропе в мм
     def scan_at_position(self, plate_x, plate_y):
-        x_off, y_off = self.crop_offset
+
         components = []
         for det in self.current_detections:
             box = det['box']
             
             box_crop = [
-                round(box[0] - x_off, 4),
-                round(box[1] - y_off, 4),
-                round(box[2] - x_off, 4),
-                round(box[3] - y_off, 4)
-            ]
+                round(box[0], 4),
+                round(box[1], 4),
+                round(box[2], 4),
+                round(box[3], 4)
+            ] # координаты бокса
             
-            cx = round((box_crop[0] + box_crop[2]) / 2, 4) # центр бокса ??????
+            cx = round((box_crop[0] + box_crop[2]) / 2, 4) # центр бокса
             cy = round((box_crop[1] + box_crop[3]) / 2, 4)
             
             cx_crop_mm = round((cx / self.CROP_SIZE_PX) * self.CROP_SIZE_MM, 4)
             cy_crop_mm = round((cy / self.CROP_SIZE_PX) * self.CROP_SIZE_MM, 4)
 
-            global_x = round(plate_y + cx_crop_mm, 4)
-            global_y = round(plate_x + cy_crop_mm, 4)
+            global_x = round(cx_crop_mm + plate_y, 4)
+            global_y = round(cy_crop_mm + plate_x, 4)
             
             components.append({
                 'class_name': self.CLASS_NAMES[det['class']],
