@@ -23,6 +23,12 @@ pcb-tile --size 640 --overlap 0.2
 
 # Train model
 pcb-train
+
+# best.pt -> best.onnx
+python app/utils/converters/pt_to_onnx.py --pt runs/detect/one-board-dataset/weights/best.pt
+
+# best.onnx -> best.rknn
+python app/utils/converters/onnx_to_rknn.py --onnx runs/detect/one-board-dataset/weights/best.onnx
 ```
 
 ## 🛠️ Tech Stack
