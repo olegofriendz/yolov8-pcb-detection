@@ -43,13 +43,13 @@ class RKNNdetect:
         img_normalized = img_rgb.astype(np.float32) / 255.0 # uint8 -> float32
         img_input = np.transpose(img_normalized, (2, 0, 1)) # перестановка осей
         img_input = np.expand_dims(img_input, axis=0) # batch
-        return img_input
+        return np.ascontiguousarray(img_input)
 
 
     def postprocess(self, outputs, x_off, y_off, orig_shape):
         output = outputs[0][0].transpose(1, 0) # транспонирование тензора в необходимый формат
         boxes = output[:, :4]
-        scores = 1 / (1 + np.exp(-output[:, 4:4+self.num_classes])) # логиты -> вероятность [0..1]
+        scores = output[:, 4:4+self.num_classes] # логиты -> вероятность [0..1]
         class_ids = np.argmax(scores, axis=1)
         class_scores = np.max(scores, axis=1)
         
@@ -100,8 +100,8 @@ class RKNNdetect:
                 cls_x2 - cls_x1,
                 cls_y2 - cls_y1
             ], axis=1) # формат [x, y, w, h] для cv2.dnn.NMSBoxes
-            
-            indices = cv2.dnn.NMSBoxes(xywh.tolist(), cls_scores.tolist(), self.conf_thres, self.nms_thres) # NMS
+       
+            indices = cv2.dnn.NMSBoxes(xywh.tolist(), cls_scores.tolist(), score_threshold=self.conf_thres, nms_threshold=self.nms_thres) # NMS
             
             if len(indices) > 0:
                 for idx in indices.flatten():

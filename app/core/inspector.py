@@ -25,7 +25,7 @@ class Inspector:
     BAUD_RATE = 115200
     
     CONF_THRES = 0.65
-    NMS_THRES = 0.8
+    NMS_THRES = 0
     NUM_CLASSES = 5
     CLASS_NAMES = ['chip-capacitor', 'chip-resistor', 'diode', 'ic', 'transistor']
     
@@ -160,8 +160,8 @@ class Inspector:
 
         all_components = []
 
-        self.motion.go_zero()
-        self.motion.move_relative(100, 100, feedrate=2000)
+        # self.motion.go_zero()
+        # self.motion.move_relative(100, 100, feedrate=2000)
         self.motion.set_home() # установить дом в левом верхнем углы платы
 
         for i, (x, y) in enumerate(points):
@@ -173,8 +173,10 @@ class Inspector:
             components = self.scan_at_position(x, y)
             all_components.extend(components)
 
-        print(f"Всего компонентов найдено: {len(all_components)}")
-        self.save_results(all_components)
+        unique_components = self.remove_duplicate_components(all_components)
+        print(f"Всего найдено компонентов: {len(all_components)}")
+        print(f"Компонентов после фильтрации: {len(unique_components)}")
+        self.save_results(unique_components)
         print(f"Сканирование завершено.")
         self.motion.home()
 
@@ -286,7 +288,7 @@ class Inspector:
         return str(filepath)
     
     # удалить элементы которые встретились повторно
-    def remove_duplicate_components(self, components, distance_threshold_mm=3.0, iou_threshold=0.5):
+    def remove_duplicate_components(self, components, distance_threshold_mm=2.0, iou_threshold=0.0) -> list:
         if len(components) <= 1:
             return components
         
