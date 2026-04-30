@@ -39,6 +39,8 @@ class Inspector:
     PLATE_HEIGHT = 200
     OVERLAP_PERCENT = 40 # перекрытие в процентах
 
+    STANDART_FILENAME = "standart_plate.json"
+
     def __init__(self, model_path=None):
         print("\n[1/3] Запуск камеры...")
         self.camera = CameraCapture(camera_id=self.CAMERA_ID, width=self.FRAME_WIDTH, height=self.FRAME_HEIGHT)
@@ -174,11 +176,12 @@ class Inspector:
             all_components.extend(components)
 
         unique_components = self.remove_duplicate_components(all_components)
+
         print(f"Всего найдено компонентов: {len(all_components)}")
         print(f"Компонентов после фильтрации: {len(unique_components)}")
-        self.save_results(unique_components)
         print(f"Сканирование завершено.")
         self.motion.home()
+        return unique_components
 
     # получить список координат для прохода "змейкой"
     def generate_snake_points(self, plate_width, plate_height, crop_size_mm, overlap_percent) -> list:
@@ -262,9 +265,6 @@ class Inspector:
 
     # сохранить результаты в файл
     def save_results(self, components, filename=None):
-        if filename is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"scan_results_{timestamp}.json"
 
         results = {
             'metadata': {
@@ -287,7 +287,7 @@ class Inspector:
         print(f"Результаты сохранены в {filepath}.")
         return str(filepath)
     
-    # удалить элементы которые встретились повторно
+    # удалить элементы которые встретились повторно (доработать систему iou, сейчас проверка только по расстоянию от центров боксов)
     def remove_duplicate_components(self, components, distance_threshold_mm=2.0, iou_threshold=0.0) -> list:
         if len(components) <= 1:
             return components

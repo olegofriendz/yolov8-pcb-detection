@@ -5,11 +5,12 @@ from threading import Thread
 from core.inspector import Inspector
 from hardware.motion import MotionContoller
 from PIL import Image, ImageTk
+from datetime import datetime
 
 class MainWindow:
     def __init__(self, inspector):
         self.inspector = inspector
-        self.mode = None # 'manual' или 'auto'
+        self.mode = None # 'manual', 'standart' или 'plate'
 
         self.root = tk.Tk()
         self.root.title("PCB Inspector")
@@ -21,16 +22,17 @@ class MainWindow:
         btn_frame = tk.Frame(top_frame)
         btn_frame.pack(side=tk.LEFT, padx=10)
         self.btn_manual = tk.Button(btn_frame, text='Ручное управление', command=self.start_manual)
-        self.btn_standard = tk.Button(btn_frame, text="Эталон", command=self.scan_standard)
-        self.btn_auto = tk.Button(btn_frame, text='Проверить', command=self.start_auto)
+        self.btn_standard = tk.Button(btn_frame, text="Эталон", command=self.start_scan_standart)
+        self.btn_plate = tk.Button(btn_frame, text='Проверить', command=self.start_scan_plate)
         self.btn_manual.pack(side=tk.LEFT, padx=10)
         self.btn_standard.pack(side=tk.LEFT, padx=10)
-        self.btn_auto.pack(side=tk.LEFT, padx=10)
+        self.btn_plate.pack(side=tk.LEFT, padx=10)
         
         # поля для ввода width, height
         size_frame = tk.Frame(top_frame)
         size_frame.pack(side=tk.LEFT, padx=20)
 
+        tk.Label(size_frame, text="Ширина платы (мм):").pack(side=tk.LEFT, padx=5)
         tk.Label(size_frame, text="Ширина платы (мм):").pack(side=tk.LEFT, padx=5)
         self.plate_width_entry = tk.Entry(size_frame, width=10)
         self.plate_width_entry.pack(side=tk.LEFT, padx=5)
@@ -57,43 +59,79 @@ class MainWindow:
         # *** добавить поля для введения размера платы *** (+)
         # *** добавить кнопку для проверки эталона ***
 
+    # ручное управление
     def start_manual(self):
         if self.mode == "manual":
             self.stop_manual()
         else:         
             self.mode = 'manual'
             self.btn_manual.config(text="Ручное управление", relief=tk.SUNKEN)
-            self.btn_auto.config(state=tk.DISABLED)
-            self.status.config(text="Ручной режим", fg="blue")
+            self.btn_standard.config(state=tk.DISABLED)
+            self.btn_plate.config(state=tk.DISABLED)
+            self.status.config(text="Ручное управление", fg="blue")
             self.inspector.motion.send("G91")
 
     def stop_manual(self):
         self.mode = None
         self.btn_manual.config(text="Ручное управление", relief=tk.RAISED)
-        self.btn_auto.config(state=tk.NORMAL)
-        self.status.config(text="Ручной режим отключен", fg="green")
+        self.btn_standard.config(state=tk.NORMAL)
+        self.btn_plate.config(state=tk.NORMAL)
+        self.status.config(text="Ручное управление отключено", fg="green")
         self.inspector.motion.send("G90")
 
-    def start_auto(self):
-        self.mode = 'auto'
-        self.btn_manual.config(state=tk.NORMAL)
-        self.btn_auto.config(state=tk.DISABLED)
-        self.status.config(text="Автоматическое сканирование...", fg="orange")
-        
-        def run_scan():
-            self.inspector.scan_plate()
-            self.root.after(0, self.stop_auto)
-        
-        Thread(target=run_scan, daemon=True).start() # отдельный поток 
+    # сканировать эталон
+    def start_scan_standart(self):
+        if self.mode == "standart":
+            self.stop_scan_standart()
+        else:
+            self.mode = 'standart'
+            self.btn_standard.config(text="Эталон", relief=tk.SUNKEN)
+            self.btn_manual.config(state=tk.DISABLED)
+            self.btn_plate.config(state=tk.DISABLED)
+            self.status.config(text="Сканирование эталона...", fg="orange")
+            
+            def run_scan():
+                components = self.inspector.scan_plate()
+                self.inspector.save_results(components, filename="standart_plate.json")
+                self.root.after(0, self.stop_scan_standart())
+            
+            Thread(target=run_scan, daemon=True).start() # отдельный поток 
     
-    def stop_auto(self):
+    def stop_scan_standart(self):
         self.mode = None
-        self.btn_auto.config(state=tk.NORMAL)
-        self.status.config(text="Сканирование завершено", fg="green")
+        self.btn_standard.config(text="Эталон", relief=tk.RAISED)
+        self.btn_manual.config(state=tk.NORMAL)
+        self.btn_plate.config(state=tk.NORMAL)
+        self.status.config(text="Сканирование эталона завершено", fg="green")
 
-    # сканировать эталонную плату
-    def scan_standard(self):
-        pass
+    # сканировать плату
+    def start_scan_plate(self):
+        if self.mode == "plate":
+            self.stop_scan_plate()
+        else:
+            self.mode = 'plate'
+            self.btn_plate.config(text="Проверить плату", relief=tk.SUNKEN)
+            self.btn_manual.config(state=tk.DISABLED)
+            self.btn_standard.config(state=tk.DISABLED)
+            self.status.config(text="Проверка платы...", fg="orange")
+
+            def run_scan():
+                components = self.inspector.scan_plate()
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                self.inspector.save_results(components, filename=f"inspection_{timestamp}.json")
+                self.root.after(0, self.stop_scan_plate())
+
+                # == добавить сравнение ==
+
+            Thread(target=run_scan, daemon=True).start()
+
+    def stop_scan_plate(self):
+        self.mode = None
+        self.btn_plate.config(text="Проверить плату", relief=tk.RAISED)
+        self.btn_manual.config(state=tk.NORMAL)
+        self.btn_standard.config(state=tk.NORMAL)
+        self.status.config(text="Проверка платы завершена", fg="green")
+
 
     # кадр OpenCV -> изображение Tkinter
     def convert_frame_for_tkinter(self, opencv_frame):
