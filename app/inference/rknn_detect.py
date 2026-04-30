@@ -122,31 +122,6 @@ class RKNNdetect:
         
         return final_detections
 
-
-    def stabilize(self, detections):
-        new_history = []
-        for det in detections:
-            cx = (det['box'][0] + det['box'][2]) / 2
-            cy = (det['box'][1] + det['box'][3]) / 2
-            matched = False
-            for h in self.history:
-                if h['class'] == det['class'] and abs(h['cx'] - cx) < 25 and abs(h['cy'] - cy) < 25:
-                    h['count'] += 1
-                    h['cx'], h['cy'] = cx, cy
-                    h['box'] = det['box']
-                    h['score'] = det['score']
-                    new_history.append(h)
-                    matched = True
-                    break
-            if not matched:
-                new_history.append({'class': det['class'], 'cx': cx, 'cy': cy, 'count': 1,
-                                    'box': det['box'], 'score': det['score']})
-        
-        self.history = new_history
-        stable = [h for h in self.history if h['count'] >= self.stable_frames] # объекты, накопившие достаточно кадров stable_frames
-        return [{'box': h['box'], 'class': h['class'], 'score': h['score']} for h in stable] # формат детекций
-    
-
     def detect(self, frame, x_off=None, y_off=None):
         h, w = frame.shape[:2]
         
@@ -160,9 +135,8 @@ class RKNNdetect:
         outputs = self.rknn.inference(inputs=[img_input], data_format='nchw')
 
         detections = self.postprocess(outputs, x_off, y_off, (h, w))
-        stable_detections = self.stabilize(detections)
-        
-        return stable_detections, crop_frame, (x_off, y_off)
+
+        return detections, crop_frame, (x_off, y_off)
     
 
     def release(self):

@@ -24,8 +24,8 @@ class Inspector:
     COM_PORT = "/dev/ttyUSB0"
     BAUD_RATE = 115200
     
-    CONF_THRES = 0.65
-    NMS_THRES = 0
+    CONF_THRES = 0.7
+    NMS_THRES = 0.4
     NUM_CLASSES = 5
     CLASS_NAMES = ['chip-capacitor', 'chip-resistor', 'diode', 'ic', 'transistor']
     
