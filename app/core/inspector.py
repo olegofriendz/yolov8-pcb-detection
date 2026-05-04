@@ -39,7 +39,7 @@ class Inspector:
     PLATE_HEIGHT = 200
     OVERLAP_PERCENT = 40 # перекрытие в процентах
 
-    STANDART_FILENAME = "standart_plate.json"
+    STANDARD_FILENAME = "standard_plate.json"
 
     def __init__(self, model_path=None):
         print("\n[1/3] Запуск камеры...")

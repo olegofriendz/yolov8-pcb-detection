@@ -77,7 +77,7 @@ class MotionContoller:
             return ""
 
         self.send("G90")
-        self.send("G1 X0 Y0 F1000")
+        self.send("G1 X0 Y0 F2000")
 
     # создать ноль
     def set_home(self):

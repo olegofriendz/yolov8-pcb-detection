@@ -12,7 +12,8 @@ from pathlib import Path
 class MainWindow:
     def __init__(self, inspector):
         self.inspector = inspector
-        self.mode = None  # 'manual', 'standart' или 'plate'
+        self.mode = None  # 'manual', 'standard' или 'plate'
+        self.defects_list = []
 
         self.root = tk.Tk()
         self.root.title("PCB Inspector")
@@ -27,7 +28,7 @@ class MainWindow:
         modes_frame.pack(side=tk.LEFT, padx=(10, 5), pady=5, fill='y')
 
         self.btn_manual = tk.Button(modes_frame, text='Ручное управление', command=self.start_manual, width=20, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
-        self.btn_standard = tk.Button(modes_frame, text='Снять эталон', command=self.start_scan_standart, width=20, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
+        self.btn_standard = tk.Button(modes_frame, text='Снять эталон', command=self.start_scan_standard, width=20, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
         self.btn_plate = tk.Button(modes_frame, text='Проверить плату', command=self.start_scan_plate, width=20, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
         
         self.btn_manual.pack(side=tk.LEFT, padx=3)
@@ -111,11 +112,11 @@ class MainWindow:
         self.inspector.motion.send("G90")
 
     # сканировать эталон
-    def start_scan_standart(self):
-        if self.mode == "standart":
-            self.stop_scan_standart()
+    def start_scan_standard(self):
+        if self.mode == "standard":
+            self.stop_scan_standard()
         else:
-            self.mode = 'standart'
+            self.mode = 'standard'
             self.btn_standard.config(text="Эталон", relief=tk.SUNKEN)
             self.btn_manual.config(state=tk.DISABLED)
             self.btn_plate.config(state=tk.DISABLED)
@@ -123,12 +124,12 @@ class MainWindow:
             
             def run_scan():
                 components = self.inspector.scan_plate()
-                self.inspector.save_results(components, filename="standart_plate.json")
-                self.root.after(0, self.stop_scan_standart())
+                self.inspector.save_results(components, filename="standard_plate.json")
+                self.root.after(0, self.stop_scan_standard())
             
             Thread(target=run_scan, daemon=True).start() # отдельный поток 
     
-    def stop_scan_standart(self):
+    def stop_scan_standard(self):
         self.mode = None
         self.btn_standard.config(text="Эталон", relief=tk.RAISED)
         self.btn_manual.config(state=tk.NORMAL)
@@ -147,37 +148,54 @@ class MainWindow:
             self.status.config(text="Проверка платы...", fg="orange")
 
             def run_scan():
-                current_components = self.inspector.scan_plate()
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                self.inspector.save_results(current_components, filename=f"inspection_{timestamp}.json")
+                try:
+                    current_components = self.inspector.scan_plate()
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    self.inspector.save_results(current_components, filename=f"inspection_{timestamp}.json")
 
-                # сравнение с эталоном
-                standart_components = self.load_standart_components() # получить компоненты эталона из файла
+                    # сравнение с эталоном
+                    standard_components = self.load_standard_components() # получить компоненты эталона из файла
 
-                self.defects_list = self.inspector.compare_with_standart(
-                    standart_components=standart_components,
-                    current_components=current_components,
-                    match_distance_mm=1.0, # расстояние между центрами пар для поиска
-                    shift_distance_mm=2.0  # допустимое смещение
-                )
+                    self.defects_list = self.inspector.compare_with_standard(
+                        standard_components=standard_components,
+                        current_components=current_components,
+                        match_distance_mm=1.0, # расстояние между центрами пар для поиска
+                        shift_distance_mm=2.0  # допустимое смещение
+                    )
+                # не создан эталон
+                except FileNotFoundError as e:
+                    self.defects_list = []
+                    self.root.after(0, lambda: self.stop_scan_plate(error=str(e)))
+                    return
+                except Exception as e:
+                    self.defects_list = []
+                    self.root.after(0, lambda: self.stop_scan_plate(error=f"Ошибка {e}"))
+                    return
 
-                if not self.defects_list:
-                    self.root.after(0, lambda: self.status.config(text="Ошибок не найдено!", fg="green"))
-                    self.btn_next_defect.config(state=tk.DISABLED)
-                else:
-                    self.root.after(0, lambda: self.status.config(text=f"Найдено дефектов: {len(self.defects_list)}", fg="red"))
-                    self.btn_next_defect.config(state=tk.NORMAL)
-
-                self.root.after(0, self.stop_scan_plate())
+                self.root.after(0, lambda: self.stop_scan_plate(defects=self.defects_list))
 
             Thread(target=run_scan, daemon=True).start()
 
-    def stop_scan_plate(self):
+    def stop_scan_plate(self, defects=None, error=None):
         self.mode = None
         self.btn_plate.config(text="Проверить плату", relief=tk.RAISED)
         self.btn_manual.config(state=tk.NORMAL)
         self.btn_standard.config(state=tk.NORMAL)
         self.status.config(text="Проверка платы завершена", fg="green")
+
+        if error:
+            self.status.config(text=error, fg="red")
+            self.btn_next_defect.config(state=tk.DISABLED)
+        elif defects is not None:
+            if len(defects) == 0:
+                self.status.config(text="Ошибок не найдено!", fg="green")
+                self.btn_next_defect.config(state=tk.DISABLED)
+            else:
+                self.status.config(text=f"Найдено дефектов: {len(defects)}", fg="red")
+                self.btn_next_defect.config(state=tk.NORMAL)
+        else:
+            self.status.config(text="Проверка платы прервана", fg="orange")
+            self.btn_next_defect.config(state=tk.DISABLED)
 
 
     # кадр OpenCV -> изображение Tkinter
@@ -241,8 +259,8 @@ class MainWindow:
             self.status.config(text=f"Ошибка: неверный ввод!", fg="red")
 
     # прочитать файл эталона
-    def load_standart_components(self):
-        filepath = Path(__file__).parent.parent / "results" / self.inspector.STANDART_FILENAME
+    def load_standard_components(self):
+        filepath = Path(__file__).parent.parent / "results" / self.inspector.STANDARD_FILENAME
 
         if not filepath.exists():
             raise FileNotFoundError(f"Файл эталона не найден: {filepath}.")
