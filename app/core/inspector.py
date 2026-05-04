@@ -340,7 +340,7 @@ class Inspector:
         
         return unique
         
-    # получить iou боксов    
+    # получить iou боксов (ИСПРАВИТЬ!!!)   
     def compute_iou(self, box1, box2):
         x1 = max(box1[0], box2[0])
         y1 = max(box1[1], box2[1])
@@ -356,6 +356,94 @@ class Inspector:
         union = area1 + area2 - intersection
         
         return intersection / union if union > 0 else 0.0
+    
+    # сравнение текущей платы с эталоном
+    def compare_with_standard(self, standard_components, current_components, match_distance_mm=1.0, shift_distance_mm=2.0) -> list:
+        defects = []
+        
+        # Множества для отслеживания использованных элементов
+        used_standard = set()
+        used_current = set()
+        
+        # Шаг 1: Ищем всех кандидатов на пару (расстояние < match_distance_mm)
+        pairs = []
+        for i, s_comp in enumerate(standard_components):
+            for j, c_comp in enumerate(current_components):
+                dx = abs(s_comp['center_mm'][0] - c_comp['center_mm'][0])
+                dy = abs(s_comp['center_mm'][1] - c_comp['center_mm'][1])
+                distance = (dx**2 + dy**2)**0.5
+                
+                if distance <= match_distance_mm:
+                    pairs.append({
+                        's_idx': i, 
+                        'c_idx': j, 
+                        'distance': distance,
+                        'same_class': s_comp['class_id'] == c_comp['class_id']
+                    })
+                    
+        # Шаг 2: Сортируем пары по расстоянию (сначала самые близкие)
+        pairs.sort(key=lambda x: x['distance'])
+        
+        # Шаг 3: Сопоставляем пары
+        for pair in pairs:
+            s_idx, c_idx = pair['s_idx'], pair['c_idx']
+            
+            # Если элементы уже использованы в другой паре - пропускаем
+            if s_idx in used_standard or c_idx in used_current:
+                continue
+                
+            s_comp = standard_components[s_idx]
+            c_comp = current_components[c_idx]
+            distance = pair['distance']
+            
+            if pair['same_class']:
+                # Классы одинаковые. Проверяем сдвиг
+                if distance > shift_distance_mm:
+                    defects.append({
+                        'type': 'SHIFTED',
+                        'standard_comp': s_comp,
+                        'current_comp': c_comp,
+                        'distance': round(distance, 2),
+                        'status': 'pending'
+                    })
+                # Если сдвиг в норме - это корректный элемент, дефекта нет
+            else:
+                # Классы разные!
+                defects.append({
+                    'type': 'WRONG_CLASS',
+                    'standard_comp': s_comp,
+                    'current_comp': c_comp,
+                    'distance': round(distance, 2),
+                    'status': 'pending'
+                })
+                
+            # Помечаем элементы как использованные
+            used_standard.add(s_idx)
+            used_current.add(c_idx)
+            
+        # Шаг 4: Ищем отсутствующие элементы (из эталона, которым не нашлось пары)
+        for i, s_comp in enumerate(standard_components):
+            if i not in used_standard:
+                defects.append({
+                    'type': 'MISSING',
+                    'standard_comp': s_comp,
+                    'current_comp': None,
+                    'distance': None,
+                    'status': 'pending'
+                })
+                
+        # Шаг 5: Ищем лишние элементы (на текущей плате, которым не нашлось пары)
+        for j, c_comp in enumerate(current_components):
+            if j not in used_current:
+                defects.append({
+                    'type': 'EXTRA',
+                    'standard_comp': None,
+                    'current_comp': c_comp,
+                    'distance': None,
+                    'status': 'pending'
+                })
+                
+        return defects
 
 
     # получить последний кадр для gui
