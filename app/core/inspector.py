@@ -258,7 +258,8 @@ class Inspector:
                 'bbox_crop': box_crop,
                 'center_px': [cx, cy],
                 'center_mm': [global_x, global_y],
-                'confidence': round(det['score'], 4)
+                'confidence': round(det['score'], 4),
+                'crop_origin_mm': [plate_y, plate_x] # координаты кропа для перемещения станка (реверс осей)
             })
         
         return components

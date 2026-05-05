@@ -14,6 +14,7 @@ class MainWindow:
         self.inspector = inspector
         self.mode = None  # 'manual', 'standard' или 'plate'
         self.defects_list = []
+        self.current_defect_idx = 0 # на какой ошибке произошла остановка
 
         self.root = tk.Tk()
         self.root.title("PCB Inspector")
@@ -39,7 +40,7 @@ class MainWindow:
         tools_frame = tk.LabelFrame(top_panel, text=" Инструменты ", bg='#ffffff', font=("Arial", 10, "bold"), padx=10, pady=8)
         tools_frame.pack(side=tk.LEFT, padx=5, pady=5, fill='y')
 
-        self.btn_next_defect = tk.Button(tools_frame, text='Следующий дефект', width=18, height=2, bg='#ff9800', fg='white', font=("Arial", 10, "bold"))
+        self.btn_next_defect = tk.Button(tools_frame, command=self.show_next_defect, text='Следующий дефект', width=18, height=2, bg='#ff9800', fg='white', font=("Arial", 10, "bold"))
         self.btn_next_defect.pack(side=tk.LEFT, padx=3)
 
         # Разделитель
@@ -73,7 +74,7 @@ class MainWindow:
         tk.Button(size_row, text="Применить", command=self.apply_plate_size, bg='#4caf50', fg='white', font=("Arial", 10, "bold"),
                   height=1).pack(side=tk.LEFT, padx=(10, 0))
 
-        # Статус - центрируется в оставшемся пространстве
+        # Статус
         status_frame = tk.Frame(top_panel, bg='#ffffff')
         status_frame.pack(side=tk.LEFT, fill='both', expand=True, padx=5, pady=5)
 
@@ -162,6 +163,18 @@ class MainWindow:
                         match_distance_mm=1.0, # расстояние между центрами пар для поиска
                         shift_distance_mm=2.0  # допустимое смещение
                     )
+
+                    self.defects_list.sort(key=lambda d: (d.get('current_comp') or d.get('standard_comp'))['crop_origin_mm']) # сортировка дефектов по кропам
+
+                    # ВРЕМЕННЫЙ КОД ДЛЯ ОТЛАДКИ: Вывод шагов и статусов
+                    print("\n--- ОТЛАДКА ДЕФЕКТОВ ---")
+                    for i, defect in enumerate(self.defects_list):
+                        target_comp = defect.get('current_comp') or defect.get('standard_comp')
+                        crop_origin = target_comp['crop_origin_mm']
+                        print(f"Ошибка {i+1}: Тип={defect['type']}, Кроп(origin)={crop_origin}, Класс={target_comp['class_name']}")
+                    print("------------------------\n")
+                    # КОНЕЦ ВРЕМЕННОГО КОДА
+
                 # не создан эталон
                 except FileNotFoundError as e:
                     self.defects_list = []
@@ -268,6 +281,48 @@ class MainWindow:
             data = json.load(f)
 
         return data['components']
+    
+    # перейти к следующему найденному дефекту
+    def show_next_defect(self):
+        if not self.defects_list:
+            self.status.config(text="Список дефектов пуст", fg="green")
+            return
+
+        if self.current_defect_idx >= len(self.defects_list):
+            self.current_defect_idx = 0
+            self.status.config(text="Достигнут конец списка.", fg="blue")
+
+        defect = self.defects_list[self.current_defect_idx]
+        
+        target_comp = defect.get('current_comp') or defect.get('standard_comp') # missing - эталон, другие - плата
+        crop_x, crop_y = target_comp['crop_origin_mm']
+
+        display_num = self.current_defect_idx + 1 # индекс для отображения в статусе
+        total_defects = len(self.defects_list)
+
+        self.btn_next_defect.config(state=tk.DISABLED) # кнопка заблокирована во время движения
+        self.status.config(text=f"Двигаюсь к ошибке {display_num}/{total_defects}...", fg="orange")
+
+        def move_and_show():
+            self.inspector.motion.move_absolute(crop_x, crop_y, feedrate=2000)
+            self.inspector.motion.wait_for_stop()
+            time.sleep(0.5)
+            
+            # обновить статус
+            defect_type_translate = {
+                'MISSING': 'Отсутствует',
+                'EXTRA': 'Лишний',
+                'WRONG_CLASS': 'Не тот класс',
+                'SHIFTED': 'Сдвинут'
+            }
+            type_str = defect_type_translate.get(defect['type'], defect['type'])
+
+            self.root.after(0, lambda: self.btn_next_defect.config(state=tk.NORMAL))
+            self.root.after(0, lambda: self.status.config(text=f"Ошибка {display_num}/{total_defects}: {type_str} ({target_comp['class_name']})", fg="red"))
+            
+            self.current_defect_idx += 1
+
+        Thread(target=move_and_show, daemon=True).start()
     
     def run(self):
         self.root.mainloop()
