@@ -62,6 +62,7 @@ class Inspector:
         self.total_detections = 0
         self.current_frame = None # для gui
         self.current_detections = []
+        self.active_defect = None # дефект для подсветки в кадре после проверки
 
         self.running = True
         self.processing_thread = Thread(target=self._process_loop, daemon=True)
@@ -91,6 +92,7 @@ class Inspector:
         )
         
         frame_with_boxes = self.draw_detections(frame, detections)
+        frame_with_boxes = self.draw_defect_overlay(frame=frame_with_boxes)
         frame_with_boxes = self.draw_info(frame_with_boxes, detections, x_off_actual, y_off_actual)
 
         self.current_frame = frame_with_boxes
@@ -445,7 +447,32 @@ class Inspector:
                 })
                 
         return defects
+    
+    # отрисовка ошибка поверх кадра
+    def draw_defect_overlay(self, frame):
+        if not self.active_defect:
+            return frame
+        
+        defect = self.active_defect
+        
+        if defect['type'] == 'MISSING':
+            std = defect['standard_comp'] # бокс из эталона
+            x1, y1, x2, y2 = [int(v) for v in std['bbox_crop']]
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
+            cv2.putText(frame, "Отсутствует", (x1, y1 - 10), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 255), 2)
 
+        elif defect['type'] == 'EXTRA':
+            cur = defect['current_comp']
+            x1, y1, x2, y2 = [int(v) for v in cur['bbox_crop']]
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
+            cv2.putText(frame, "Лишний", (x1, y1 - 10), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 255), 2)
+
+        elif defect['type'] == 'WRONG_CLASS':
+            pass
+        elif defect['type'] == 'SHIFTED':
+            pass
+
+        return frame
 
     # получить последний кадр для gui
     def get_current_frame(self):

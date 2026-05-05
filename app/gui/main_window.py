@@ -14,7 +14,7 @@ class MainWindow:
         self.inspector = inspector
         self.mode = None  # 'manual', 'standard' или 'plate'
         self.defects_list = []
-        self.current_defect_idx = 0 # на какой ошибке произошла остановка
+        self.current_defect_idx = -1 # на какой ошибке произошла остановка
 
         self.root = tk.Tk()
         self.root.title("PCB Inspector")
@@ -46,8 +46,8 @@ class MainWindow:
         # Разделитель
         tk.Frame(tools_frame, bg='#e0e0e0', width=2, height=35).pack(side=tk.LEFT, padx=8, fill='y')
 
-        self.btn_1 = tk.Button(tools_frame, text='Ложное срабатывание', width=20, height=2, bg='#f44336', fg='white', font=("Arial", 10, "bold"))
-        self.btn_2 = tk.Button(tools_frame, text='Дефект исправлен', width=16, height=2, bg='#228c22', fg='white', font=("Arial", 10, "bold"))
+        self.btn_1 = tk.Button(tools_frame, command=self.resolve_defect, text='Ложное срабатывание', width=20, height=2, bg='#f44336', fg='white', font=("Arial", 10, "bold"))
+        self.btn_2 = tk.Button(tools_frame, command=self.resolve_defect, text='Дефект исправлен', width=16, height=2, bg='#228c22', fg='white', font=("Arial", 10, "bold"))
         
         self.btn_1.pack(side=tk.LEFT, padx=2)
         self.btn_2.pack(side=tk.LEFT, padx=2)
@@ -96,7 +96,8 @@ class MainWindow:
     def start_manual(self):
         if self.mode == "manual":
             self.stop_manual()
-        else:         
+        else:
+            self.inspector.active_defect = None         
             self.mode = 'manual'
             self.btn_manual.config(text="Ручное управление", relief=tk.SUNKEN)
             self.btn_standard.config(state=tk.DISABLED)
@@ -117,6 +118,7 @@ class MainWindow:
         if self.mode == "standard":
             self.stop_scan_standard()
         else:
+            self.inspector.active_defect = None
             self.mode = 'standard'
             self.btn_standard.config(text="Эталон", relief=tk.SUNKEN)
             self.btn_manual.config(state=tk.DISABLED)
@@ -142,6 +144,7 @@ class MainWindow:
         if self.mode == "plate":
             self.stop_scan_plate()
         else:
+            self.inspector.active_defect = None
             self.mode = 'plate'
             self.btn_plate.config(text="Проверить плату", relief=tk.SUNKEN)
             self.btn_manual.config(state=tk.DISABLED)
@@ -288,10 +291,25 @@ class MainWindow:
             self.status.config(text="Список дефектов пуст", fg="green")
             return
 
-        if self.current_defect_idx >= len(self.defects_list):
-            self.current_defect_idx = 0
-            self.status.config(text="Достигнут конец списка.", fg="blue")
+        start_search_idx = (self.current_defect_idx + 1) % len(self.defects_list)
+        found_idx = -1
 
+        for i in range(len(self.defects_list)):
+            check_idx = (start_search_idx + i) % len(self.defects_list)
+            defect = self.defects_list[check_idx]
+
+            if defect.get('status', 'pending') != 'resolved':
+                found_idx = check_idx
+                break
+            
+        # ошибок нет
+        if found_idx == -1:
+            self.status.config(text='Все ошибки устранены!', fg='green')
+            self.inspector.active_defect = None
+            self.btn_next_defect.config(state=tk.DISABLED)
+            return
+
+        self.current_defect_idx = found_idx
         defect = self.defects_list[self.current_defect_idx]
         
         target_comp = defect.get('current_comp') or defect.get('standard_comp') # missing - эталон, другие - плата
@@ -304,9 +322,12 @@ class MainWindow:
         self.status.config(text=f"Двигаюсь к ошибке {display_num}/{total_defects}...", fg="orange")
 
         def move_and_show():
+            self.inspector.active_defect = None
             self.inspector.motion.move_absolute(crop_x, crop_y, feedrate=2000)
             self.inspector.motion.wait_for_stop()
             time.sleep(0.5)
+
+            self.inspector.active_defect = defect
             
             # обновить статус
             defect_type_translate = {
@@ -319,10 +340,18 @@ class MainWindow:
 
             self.root.after(0, lambda: self.btn_next_defect.config(state=tk.NORMAL))
             self.root.after(0, lambda: self.status.config(text=f"Ошибка {display_num}/{total_defects}: {type_str} ({target_comp['class_name']})", fg="red"))
-            
-            self.current_defect_idx += 1
 
         Thread(target=move_and_show, daemon=True).start()
+
+    # пометить дефект в списке чтобы не возвращаться к нему
+    def resolve_defect(self):
+        if self.current_defect_idx < 0 or self.current_defect_idx >= len(self.defects_list):
+            return
+        
+        self.defects_list[self.current_defect_idx]['status'] = 'resolved' # пометка что ошибка обработана
+        self.inspector.active_defect = None
+        self.show_next_defect()
+
     
     def run(self):
         self.root.mainloop()
