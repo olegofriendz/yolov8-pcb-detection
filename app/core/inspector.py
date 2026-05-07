@@ -63,6 +63,7 @@ class Inspector:
         self.current_frame = None # для gui
         self.current_detections = []
         self.active_defect = None # дефект для подсветки в кадре после проверки
+        self.hide_detections = False # флаг для отображения контуров элементов
 
         self.running = True
         self.processing_thread = Thread(target=self._process_loop, daemon=True)
@@ -91,8 +92,13 @@ class Inspector:
             frame, x_off=x_off, y_off=y_off
         )
         
-        frame_with_boxes = self.draw_detections(frame, detections)
-        frame_with_boxes = self.draw_defect_overlay(frame=frame_with_boxes)
+        # в режиме проверки ошибок контура не отображаются
+        if not self.hide_detections:
+            frame_with_boxes = self.draw_detections(frame, detections)
+        else:
+            frame_with_boxes = frame
+
+        frame_with_boxes = self.draw_defect_overlay(frame_with_boxes)
         frame_with_boxes = self.draw_info(frame_with_boxes, detections, x_off_actual, y_off_actual)
 
         self.current_frame = frame_with_boxes
@@ -177,7 +183,7 @@ class Inspector:
             components = self.scan_at_position(x, y)
             all_components.extend(components)
 
-        unique_components = self.remove_duplicate_components(all_components)
+        unique_components = self.remove_duplicate_components(all_components, distance_threshold_mm=3.0)
 
         print(f"Всего найдено компонентов: {len(all_components)}")
         print(f"Компонентов после фильтрации: {len(unique_components)}")
@@ -261,7 +267,7 @@ class Inspector:
                 'center_px': [cx, cy],
                 'center_mm': [global_x, global_y],
                 'confidence': round(det['score'], 4),
-                'crop_origin_mm': [plate_y, plate_x] # координаты кропа для перемещения станка (реверс осей)
+                'crop_origin_mm': [plate_x, plate_y] # координаты кропа для перемещения станка (реверс осей)
             })
         
         return components
@@ -291,7 +297,7 @@ class Inspector:
         return str(filepath)
     
     # удалить элементы которые встретились повторно (доработать систему iou, сейчас проверка только по расстоянию от центров боксов)
-    def remove_duplicate_components(self, components, distance_threshold_mm=2.0, iou_threshold=0.0) -> list:
+    def remove_duplicate_components(self, components, distance_threshold_mm=3.0, iou_threshold=0.0) -> list:
         if len(components) <= 1:
             return components
         
@@ -361,14 +367,20 @@ class Inspector:
         return intersection / union if union > 0 else 0.0
     
     # сравнение текущей платы с эталоном
-    def compare_with_standard(self, standard_components, current_components, match_distance_mm=1.0, shift_distance_mm=2.0) -> list:
+    def compare_with_standard(self, standard_components, current_components, match_distance_mm, shift_distance_mm) -> list:
         defects = []
         
-        # Множества для отслеживания использованных элементов
+        # множества для отслеживания использованных элементов
         used_standard = set()
         used_current = set()
+
+        print("\n" + "="*50)
+        print(" НАЧАЛО СРАВНЕНИЯ С ЭТАЛОНОМ ")
+        print(f" Эталон: {len(standard_components)} элем. | Текущая: {len(current_components)} элем. ")
+        print(f" Порог поиска пары: {match_distance_mm} мм | Порог сдвига: {shift_distance_mm} мм")
+        print("="*50)
         
-        # Шаг 1: Ищем всех кандидатов на пару (расстояние < match_distance_mm)
+        # поиск всех кандидатов на пару (расстояние < match_distance_mm)
         pairs = []
         for i, s_comp in enumerate(standard_components):
             for j, c_comp in enumerate(current_components):
@@ -384,14 +396,12 @@ class Inspector:
                         'same_class': s_comp['class_id'] == c_comp['class_id']
                     })
                     
-        # Шаг 2: Сортируем пары по расстоянию (сначала самые близкие)
-        pairs.sort(key=lambda x: x['distance'])
+        pairs.sort(key=lambda x: x['distance']) # сортировка пар по расстоянию (близкие -> дальние)
         
-        # Шаг 3: Сопоставляем пары
         for pair in pairs:
             s_idx, c_idx = pair['s_idx'], pair['c_idx']
             
-            # Если элементы уже использованы в другой паре - пропускаем
+            # пропуск элементов которые уже использовались в парах
             if s_idx in used_standard or c_idx in used_current:
                 continue
                 
@@ -400,7 +410,7 @@ class Inspector:
             distance = pair['distance']
             
             if pair['same_class']:
-                # Классы одинаковые. Проверяем сдвиг
+                # если классы совпали -> проверка сдвига
                 if distance > shift_distance_mm:
                     defects.append({
                         'type': 'SHIFTED',
@@ -409,9 +419,12 @@ class Inspector:
                         'distance': round(distance, 2),
                         'status': 'pending'
                     })
-                # Если сдвиг в норме - это корректный элемент, дефекта нет
+                else:
+                    print(f"[ОК] Эталон #{s_idx} ({s_comp['class_name']} @ {s_comp['center_mm']}) + Текущий #{c_idx} ({c_comp['class_name']} @ {c_comp['center_mm']}) -> dist={distance:.2f} мм")
+                # если сдвиг в норме -> дефекта нет
             else:
-                # Классы разные!
+                print(f"[НЕ ТОТ КЛАСС] Эталон #{s_idx} ({s_comp['class_name']} @ {s_comp['center_mm']}) + Текущий #{c_idx} ({c_comp['class_name']} @ {c_comp['center_mm']}) -> dist={distance:.2f} мм")
+                # неверный класс
                 defects.append({
                     'type': 'WRONG_CLASS',
                     'standard_comp': s_comp,
@@ -420,13 +433,14 @@ class Inspector:
                     'status': 'pending'
                 })
                 
-            # Помечаем элементы как использованные
+            # помечаем элементы как использованные
             used_standard.add(s_idx)
             used_current.add(c_idx)
             
-        # Шаг 4: Ищем отсутствующие элементы (из эталона, которым не нашлось пары)
+        # поиск отсутствующих элементов (из эталона, которым не нашлось пары)
         for i, s_comp in enumerate(standard_components):
             if i not in used_standard:
+                print(f"[ОТСУТСТВУЕТ] Эталон #{i} ({s_comp['class_name']} @ {s_comp['center_mm']}) - НЕ НАШЕЛ ПАРЫ В РАДИУСЕ {match_distance_mm} мм")
                 defects.append({
                     'type': 'MISSING',
                     'standard_comp': s_comp,
@@ -435,9 +449,10 @@ class Inspector:
                     'status': 'pending'
                 })
                 
-        # Шаг 5: Ищем лишние элементы (на текущей плате, которым не нашлось пары)
+        # поиск лишних элементов (на текущей плате, которым не нашлось пары)
         for j, c_comp in enumerate(current_components):
             if j not in used_current:
+                print(f"[ЛИШНИЙ] Текущий #{j} ({c_comp['class_name']} @ {c_comp['center_mm']}) - НЕТ В ЭТАЛОНЕ В РАДИУСЕ {match_distance_mm} мм")
                 defects.append({
                     'type': 'EXTRA',
                     'standard_comp': None,
@@ -448,7 +463,7 @@ class Inspector:
                 
         return defects
     
-    # отрисовка ошибка поверх кадра
+    # отрисовка ошибок поверх кадра
     def draw_defect_overlay(self, frame):
         if not self.active_defect:
             return frame

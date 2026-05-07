@@ -10,7 +10,7 @@ class CameraCapture:
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1) # 1 - ручной режим
-        self.cap.set(cv2.CAP_PROP_EXPOSURE, 750)
+        self.cap.set(cv2.CAP_PROP_EXPOSURE, 800)
         self.frame = None
         self.lock = threading.Lock()
         self.running = True

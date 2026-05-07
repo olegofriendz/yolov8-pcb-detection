@@ -42,7 +42,7 @@ class MainWindow:
         tools_frame = tk.LabelFrame(top_panel, text=" Инструменты ", bg='#ffffff', font=("Arial", 10, "bold"), padx=10, pady=8)
         tools_frame.pack(side=tk.LEFT, padx=5, pady=5, fill='y')
 
-        self.btn_next_defect = tk.Button(tools_frame, command=self.show_next_defect, text='Следующий дефект', width=18, height=2, bg='#ff9800', fg='white', font=("Arial", 10, "bold"))
+        self.btn_next_defect = tk.Button(tools_frame, command=self.show_next_defect, text='Показать дефекты', width=18, height=2, bg='#ff9800', fg='white', font=("Arial", 10, "bold"))
         self.btn_next_defect.pack(side=tk.LEFT, padx=3)
 
         # Разделитель
@@ -101,6 +101,7 @@ class MainWindow:
         else:
             self.inspector.active_defect = None         
             self.mode = 'manual'
+            self.inspector.hide_detections = False
             self.btn_manual.config(text="Ручное управление", relief=tk.SUNKEN)
             self.btn_standard.config(state=tk.DISABLED)
             self.btn_plate.config(state=tk.DISABLED)
@@ -122,6 +123,7 @@ class MainWindow:
         else:
             self.inspector.active_defect = None
             self.mode = 'standard'
+            self.inspector.hide_detections = False
             self.btn_standard.config(text="Эталон", relief=tk.SUNKEN)
             self.btn_manual.config(state=tk.DISABLED)
             self.btn_plate.config(state=tk.DISABLED)
@@ -148,6 +150,7 @@ class MainWindow:
         else:
             self.inspector.active_defect = None
             self.mode = 'plate'
+            self.inspector.hide_detections = False
             self.btn_plate.config(text="Проверить плату", relief=tk.SUNKEN)
             self.btn_manual.config(state=tk.DISABLED)
             self.btn_standard.config(state=tk.DISABLED)
@@ -170,13 +173,6 @@ class MainWindow:
                     )
 
                     self.defects_list.sort(key=lambda d: (d.get('current_comp') or d.get('standard_comp'))['crop_origin_mm']) # сортировка дефектов по кропам
-
-                    print("\n--- ОТЛАДКА ДЕФЕКТОВ ---")
-                    for i, defect in enumerate(self.defects_list):
-                        target_comp = defect.get('current_comp') or defect.get('standard_comp')
-                        crop_origin = target_comp['crop_origin_mm']
-                        print(f"Ошибка {i+1}: Тип={defect['type']}, Кроп(origin)={crop_origin}, Класс={target_comp['class_name']}")
-                    print("------------------------\n")
 
                 # не создан эталон
                 except FileNotFoundError as e:
@@ -202,16 +198,20 @@ class MainWindow:
         if error:
             self.status.config(text=error, fg="red")
             self.btn_next_defect.config(state=tk.DISABLED)
+            self.inspector.hide_detections = False
         elif defects is not None:
             if len(defects) == 0:
                 self.status.config(text="Ошибок не найдено!", fg="green")
                 self.btn_next_defect.config(state=tk.DISABLED)
+                self.inspector.hide_detections = False
             else:
                 self.status.config(text=f"Найдено дефектов: {len(defects)}", fg="red")
-                self.btn_next_defect.config(state=tk.NORMAL)
+                self.btn_next_defect.config(state=tk.NORMAL, text='Показать дефекты')
+                self.inspector.hide_detections = True # включаем режим скрытия контуров элементов если в режиме ошибок
         else:
             self.status.config(text="Проверка платы прервана", fg="orange")
             self.btn_next_defect.config(state=tk.DISABLED)
+            self.inspector.hide_detections = False
 
 
     # кадр OpenCV -> изображение Tkinter
@@ -311,6 +311,7 @@ class MainWindow:
 
         self.current_defect_idx = found_idx
         defect = self.defects_list[self.current_defect_idx]
+        self.btn_next_defect.config(text='Следующий дефект')
         
         target_comp = defect.get('current_comp') or defect.get('standard_comp') # missing - эталон, другие - плата
         crop_x, crop_y = target_comp['crop_origin_mm']

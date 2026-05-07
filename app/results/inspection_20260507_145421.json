@@ -1,0 +1,679 @@
+{
+  "metadata": {
+    "plate_width": 3.0,
+    "plate_height": 3.0,
+    "crop_size_mm": 75.0,
+    "overlap_percent": 40,
+    "total_components": 29,
+    "timestamp": "2026-05-07T14:54:21.713361"
+  },
+  "components": [
+    {
+      "class_name": "chip-capacitor",
+      "class_id": 0,
+      "bbox_crop": [
+        1045.75,
+        359.5,
+        1078.25,
+        377.0
+      ],
+      "center_px": [
+        1062.0,
+        368.25
+      ],
+      "center_mm": [
+        124.4531,
+        43.1543
+      ],
+      "confidence": 0.8989,
+      "crop_origin_mm": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "class_name": "chip-capacitor",
+      "class_id": 0,
+      "bbox_crop": [
+        1015.625,
+        648.375,
+        1047.375,
+        666.625
+      ],
+      "center_px": [
+        1031.5,
+        657.5
+      ],
+      "center_mm": [
+        123.8789,
+        77.0508
+      ],
+      "confidence": 0.8979,
+      "crop_origin_mm": [
+        0,
+        3.0
+      ]
+    },
+    {
+      "class_name": "chip-capacitor",
+      "class_id": 0,
+      "bbox_crop": [
+        939.625,
+        675.0,
+        955.375,
+        707.5
+      ],
+      "center_px": [
+        947.5,
+        691.25
+      ],
+      "center_mm": [
+        114.0352,
+        81.0059
+      ],
+      "confidence": 0.897,
+      "crop_origin_mm": [
+        0,
+        3.0
+      ]
+    },
+    {
+      "class_name": "chip-capacitor",
+      "class_id": 0,
+      "bbox_crop": [
+        946.875,
+        362.0625,
+        964.125,
+        394.9375
+      ],
+      "center_px": [
+        955.5,
+        378.5
+      ],
+      "center_mm": [
+        114.9727,
+        47.3555
+      ],
+      "confidence": 0.8745,
+      "crop_origin_mm": [
+        3.0,
+        3.0
+      ]
+    },
+    {
+      "class_name": "chip-resistor",
+      "class_id": 1,
+      "bbox_crop": [
+        919.375,
+        364.3125,
+        965.625,
+        386.6875
+      ],
+      "center_px": [
+        942.5,
+        375.5
+      ],
+      "center_mm": [
+        110.4492,
+        47.0039
+      ],
+      "confidence": 0.9194,
+      "crop_origin_mm": [
+        3.0,
+        0.0
+      ]
+    },
+    {
+      "class_name": "chip-resistor",
+      "class_id": 1,
+      "bbox_crop": [
+        1059.75,
+        550.625,
+        1080.25,
+        593.375
+      ],
+      "center_px": [
+        1070.0,
+        572.0
+      ],
+      "center_mm": [
+        125.3906,
+        70.0312
+      ],
+      "confidence": 0.9165,
+      "crop_origin_mm": [
+        3.0,
+        0.0
+      ]
+    },
+    {
+      "class_name": "chip-resistor",
+      "class_id": 1,
+      "bbox_crop": [
+        912.125,
+        678.875,
+        956.875,
+        701.125
+      ],
+      "center_px": [
+        934.5,
+        690.0
+      ],
+      "center_mm": [
+        109.5117,
+        80.8594
+      ],
+      "confidence": 0.9121,
+      "crop_origin_mm": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "class_name": "chip-resistor",
+      "class_id": 1,
+      "bbox_crop": [
+        1018.375,
+        526.125,
+        1037.625,
+        571.875
+      ],
+      "center_px": [
+        1028.0,
+        549.0
+      ],
+      "center_mm": [
+        123.4688,
+        67.3359
+      ],
+      "confidence": 0.9116,
+      "crop_origin_mm": [
+        3.0,
+        3.0
+      ]
+    },
+    {
+      "class_name": "chip-resistor",
+      "class_id": 1,
+      "bbox_crop": [
+        1115.25,
+        647.875,
+        1146.75,
+        665.125
+      ],
+      "center_px": [
+        1131.0,
+        656.5
+      ],
+      "center_mm": [
+        135.5391,
+        76.9336
+      ],
+      "confidence": 0.9092,
+      "crop_origin_mm": [
+        0,
+        3.0
+      ]
+    },
+    {
+      "class_name": "chip-resistor",
+      "class_id": 1,
+      "bbox_crop": [
+        1107.625,
+        577.125,
+        1124.375,
+        608.875
+      ],
+      "center_px": [
+        1116.0,
+        593.0
+      ],
+      "center_mm": [
+        133.7812,
+        69.4922
+      ],
+      "confidence": 0.9072,
+      "crop_origin_mm": [
+        0,
+        3.0
+      ]
+    },
+    {
+      "class_name": "chip-resistor",
+      "class_id": 1,
+      "bbox_crop": [
+        1209.75,
+        674.5,
+        1252.25,
+        696.5
+      ],
+      "center_px": [
+        1231.0,
+        685.5
+      ],
+      "center_mm": [
+        147.2578,
+        83.332
+      ],
+      "confidence": 0.9053,
+      "crop_origin_mm": [
+        3.0,
+        3.0
+      ]
+    },
+    {
+      "class_name": "chip-resistor",
+      "class_id": 1,
+      "bbox_crop": [
+        843.5625,
+        629.875,
+        859.9375,
+        665.125
+      ],
+      "center_px": [
+        851.75,
+        647.5
+      ],
+      "center_mm": [
+        102.8145,
+        78.8789
+      ],
+      "confidence": 0.9004,
+      "crop_origin_mm": [
+        3.0,
+        3.0
+      ]
+    },
+    {
+      "class_name": "chip-resistor",
+      "class_id": 1,
+      "bbox_crop": [
+        941.0,
+        641.625,
+        958.5,
+        676.375
+      ],
+      "center_px": [
+        949.75,
+        659.0
+      ],
+      "center_mm": [
+        111.2988,
+        77.2266
+      ],
+      "confidence": 0.8984,
+      "crop_origin_mm": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "class_name": "chip-resistor",
+      "class_id": 1,
+      "bbox_crop": [
+        809.1875,
+        680.625,
+        841.3125,
+        700.375
+      ],
+      "center_px": [
+        825.25,
+        690.5
+      ],
+      "center_mm": [
+        99.709,
+        80.918
+      ],
+      "confidence": 0.8931,
+      "crop_origin_mm": [
+        0,
+        3.0
+      ]
+    },
+    {
+      "class_name": "chip-resistor",
+      "class_id": 1,
+      "bbox_crop": [
+        1220.5,
+        389.25,
+        1260.5,
+        408.75
+      ],
+      "center_px": [
+        1240.5,
+        399.0
+      ],
+      "center_mm": [
+        148.3711,
+        49.7578
+      ],
+      "confidence": 0.8906,
+      "crop_origin_mm": [
+        3.0,
+        3.0
+      ]
+    },
+    {
+      "class_name": "chip-resistor",
+      "class_id": 1,
+      "bbox_crop": [
+        839.75,
+        364.5625,
+        870.5,
+        383.9375
+      ],
+      "center_px": [
+        855.125,
+        374.25
+      ],
+      "center_mm": [
+        100.21,
+        46.8574
+      ],
+      "confidence": 0.8896,
+      "crop_origin_mm": [
+        3.0,
+        0.0
+      ]
+    },
+    {
+      "class_name": "chip-resistor",
+      "class_id": 1,
+      "bbox_crop": [
+        837.75,
+        347.125,
+        855.0,
+        382.625
+      ],
+      "center_px": [
+        846.375,
+        364.875
+      ],
+      "center_mm": [
+        99.1846,
+        42.7588
+      ],
+      "confidence": 0.8892,
+      "crop_origin_mm": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "class_name": "chip-resistor",
+      "class_id": 1,
+      "bbox_crop": [
+        808.5625,
+        641.875,
+        825.4375,
+        676.125
+      ],
+      "center_px": [
+        817.0,
+        659.0
+      ],
+      "center_mm": [
+        98.7422,
+        77.2266
+      ],
+      "confidence": 0.8853,
+      "crop_origin_mm": [
+        0,
+        3.0
+      ]
+    },
+    {
+      "class_name": "chip-resistor",
+      "class_id": 1,
+      "bbox_crop": [
+        948.875,
+        350.5625,
+        965.125,
+        382.9375
+      ],
+      "center_px": [
+        957.0,
+        366.75
+      ],
+      "center_mm": [
+        112.1484,
+        42.9785
+      ],
+      "confidence": 0.8809,
+      "crop_origin_mm": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "class_name": "chip-resistor",
+      "class_id": 1,
+      "bbox_crop": [
+        873.9375,
+        335.5625,
+        889.0625,
+        369.4375
+      ],
+      "center_px": [
+        881.5,
+        352.5
+      ],
+      "center_mm": [
+        103.3008,
+        44.3086
+      ],
+      "confidence": 0.8608,
+      "crop_origin_mm": [
+        3.0,
+        0.0
+      ]
+    },
+    {
+      "class_name": "diode",
+      "class_id": 2,
+      "bbox_crop": [
+        815.8125,
+        529.125,
+        904.6875,
+        585.875
+      ],
+      "center_px": [
+        860.25,
+        557.5
+      ],
+      "center_mm": [
+        103.8105,
+        65.332
+      ],
+      "confidence": 0.9487,
+      "crop_origin_mm": [
+        0,
+        3.0
+      ]
+    },
+    {
+      "class_name": "diode",
+      "class_id": 2,
+      "bbox_crop": [
+        1012.75,
+        490.0,
+        1041.75,
+        543.5
+      ],
+      "center_px": [
+        1027.25,
+        516.75
+      ],
+      "center_mm": [
+        120.3809,
+        63.5566
+      ],
+      "confidence": 0.9258,
+      "crop_origin_mm": [
+        3.0,
+        0.0
+      ]
+    },
+    {
+      "class_name": "diode",
+      "class_id": 2,
+      "bbox_crop": [
+        1004.0,
+        776.75,
+        1034.0,
+        833.25
+      ],
+      "center_px": [
+        1019.0,
+        805.0
+      ],
+      "center_mm": [
+        119.4141,
+        97.3359
+      ],
+      "confidence": 0.9175,
+      "crop_origin_mm": [
+        3.0,
+        0.0
+      ]
+    },
+    {
+      "class_name": "ic",
+      "class_id": 3,
+      "bbox_crop": [
+        999.375,
+        386.0,
+        1083.625,
+        485.75
+      ],
+      "center_px": [
+        1041.5,
+        435.875
+      ],
+      "center_mm": [
+        125.0508,
+        51.0791
+      ],
+      "confidence": 0.9521,
+      "crop_origin_mm": [
+        0,
+        3.0
+      ]
+    },
+    {
+      "class_name": "ic",
+      "class_id": 3,
+      "bbox_crop": [
+        1011.875,
+        653.5,
+        1100.125,
+        751.0
+      ],
+      "center_px": [
+        1056.0,
+        702.25
+      ],
+      "center_mm": [
+        123.75,
+        85.2949
+      ],
+      "confidence": 0.9507,
+      "crop_origin_mm": [
+        3.0,
+        0.0
+      ]
+    },
+    {
+      "class_name": "ic",
+      "class_id": 3,
+      "bbox_crop": [
+        940.0,
+        618.5,
+        1011.0,
+        656.0
+      ],
+      "center_px": [
+        975.5,
+        637.25
+      ],
+      "center_mm": [
+        117.3164,
+        77.6777
+      ],
+      "confidence": 0.9365,
+      "crop_origin_mm": [
+        3.0,
+        3.0
+      ]
+    },
+    {
+      "class_name": "ic",
+      "class_id": 3,
+      "bbox_crop": [
+        947.0,
+        326.125,
+        1019.5,
+        364.5
+      ],
+      "center_px": [
+        983.25,
+        345.3125
+      ],
+      "center_mm": [
+        118.2246,
+        43.4663
+      ],
+      "confidence": 0.9204,
+      "crop_origin_mm": [
+        3.0,
+        3.0
+      ]
+    },
+    {
+      "class_name": "transistor",
+      "class_id": 4,
+      "bbox_crop": [
+        886.1875,
+        647.75,
+        917.3125,
+        687.25
+      ],
+      "center_px": [
+        901.75,
+        667.5
+      ],
+      "center_mm": [
+        105.6738,
+        78.2227
+      ],
+      "confidence": 0.9219,
+      "crop_origin_mm": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "class_name": "transistor",
+      "class_id": 4,
+      "bbox_crop": [
+        870.75,
+        355.1875,
+        901.5,
+        391.3125
+      ],
+      "center_px": [
+        886.125,
+        373.25
+      ],
+      "center_mm": [
+        106.8428,
+        43.7402
+      ],
+      "confidence": 0.9185,
+      "crop_origin_mm": [
+        0,
+        3.0
+      ]
+    }
+  ]
+}
