@@ -28,13 +28,15 @@ class MainWindow:
         modes_frame = tk.LabelFrame(top_panel, text=" Режим работы ", bg='#ffffff', font=("Arial", 10, "bold"), padx=10, pady=8)
         modes_frame.pack(side=tk.LEFT, padx=(10, 5), pady=5, fill='y')
 
-        self.btn_manual = tk.Button(modes_frame, text='Ручное управление', command=self.start_manual, width=20, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
-        self.btn_standard = tk.Button(modes_frame, text='Снять эталон', command=self.start_scan_standard, width=20, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
-        self.btn_plate = tk.Button(modes_frame, text='Проверить плату', command=self.start_scan_plate, width=20, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
+        self.btn_manual = tk.Button(modes_frame, text='Ручное управление', command=self.start_manual, width=16, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
+        self.btn_standard = tk.Button(modes_frame, text='Эталон', command=self.start_scan_standard, width=16, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
+        self.btn_plate = tk.Button(modes_frame, text='Проверить плату', command=self.start_scan_plate, width=16, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
+        self.btn_go_home = tk.Button(modes_frame, text='🏠',command=self.inspector.motion.home, width=4, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
         
         self.btn_manual.pack(side=tk.LEFT, padx=3)
         self.btn_standard.pack(side=tk.LEFT, padx=3)
         self.btn_plate.pack(side=tk.LEFT, padx=3)
+        self.btn_go_home.pack(side=tk.LEFT, padx=3)
 
         # Центральная часть: инструменты
         tools_frame = tk.LabelFrame(top_panel, text=" Инструменты ", bg='#ffffff', font=("Arial", 10, "bold"), padx=10, pady=8)
@@ -163,20 +165,18 @@ class MainWindow:
                     self.defects_list = self.inspector.compare_with_standard(
                         standard_components=standard_components,
                         current_components=current_components,
-                        match_distance_mm=1.0, # расстояние между центрами пар для поиска
+                        match_distance_mm=4.0, # расстояние между центрами пар для поиска
                         shift_distance_mm=2.0  # допустимое смещение
                     )
 
                     self.defects_list.sort(key=lambda d: (d.get('current_comp') or d.get('standard_comp'))['crop_origin_mm']) # сортировка дефектов по кропам
 
-                    # ВРЕМЕННЫЙ КОД ДЛЯ ОТЛАДКИ: Вывод шагов и статусов
                     print("\n--- ОТЛАДКА ДЕФЕКТОВ ---")
                     for i, defect in enumerate(self.defects_list):
                         target_comp = defect.get('current_comp') or defect.get('standard_comp')
                         crop_origin = target_comp['crop_origin_mm']
                         print(f"Ошибка {i+1}: Тип={defect['type']}, Кроп(origin)={crop_origin}, Класс={target_comp['class_name']}")
                     print("------------------------\n")
-                    # КОНЕЦ ВРЕМЕННОГО КОДА
 
                 # не создан эталон
                 except FileNotFoundError as e:
