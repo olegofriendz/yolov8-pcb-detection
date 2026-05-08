@@ -296,8 +296,8 @@ class Inspector:
         print(f"Результаты сохранены в {filepath}.")
         return str(filepath)
     
-    # удалить элементы которые встретились повторно (доработать систему iou, сейчас проверка только по расстоянию от центров боксов)
-    def remove_duplicate_components(self, components, distance_threshold_mm=3.0, iou_threshold=0.0) -> list:
+    # удалить элементы которые встретились повторно (поиск по расстоянию от центров)
+    def remove_duplicate_components(self, components, distance_threshold_mm=3.0) -> list:
         if len(components) <= 1:
             return components
         
@@ -319,53 +319,22 @@ class Inspector:
                 if i in used:
                     continue
                 
-                best = comp1
-                duplicates = [i]
-                
+                unique.append(comp1)
+                used.add(i)
+
                 for j, comp2 in enumerate(items[i+1:], start=i+1):
                     if j in used:
                         continue
-                    
-                    # расстояние
+
                     dx = abs(comp1['center_mm'][0] - comp2['center_mm'][0])
                     dy = abs(comp1['center_mm'][1] - comp2['center_mm'][1])
                     distance = (dx**2 + dy**2)**0.5
                     
-                    if distance > distance_threshold_mm:
-                        continue
-                    
-                    # перекрытие прямоугольников
-                    iou = self.compute_iou(comp1['bbox_crop'], comp2['bbox_crop'])
-                    
-                    if iou >= iou_threshold:
-                        duplicates.append(j)
-                        if comp2['confidence'] > best['confidence']:
-                            best = comp2
-                
-                # добавление лучшего
-                unique.append(best)
-                for idx in duplicates:
-                    used.add(idx)
+                    if distance <= distance_threshold_mm:
+                        used.add(j)
         
         return unique
         
-    # получить iou боксов (ИСПРАВИТЬ!!!)   
-    def compute_iou(self, box1, box2):
-        x1 = max(box1[0], box2[0])
-        y1 = max(box1[1], box2[1])
-        x2 = min(box1[2], box2[2])
-        y2 = min(box1[3], box2[3])
-        
-        if x2 <= x1 or y2 <= y1:
-            return 0.0
-        
-        intersection = (x2 - x1) * (y2 - y1)
-        area1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
-        area2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
-        union = area1 + area2 - intersection
-        
-        return intersection / union if union > 0 else 0.0
-    
     # сравнение текущей платы с эталоном
     def compare_with_standard(self, standard_components, current_components, match_distance_mm, shift_distance_mm) -> list:
         defects = []
