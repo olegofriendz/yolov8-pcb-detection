@@ -1,4 +1,5 @@
 check*.onnx
+app/results/*.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
