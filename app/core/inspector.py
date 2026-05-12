@@ -24,7 +24,7 @@ class Inspector:
     COM_PORT = "/dev/ttyUSB0"
     BAUD_RATE = 115200
     
-    CONF_THRES = 0.7
+    CONF_THRES = 0.65
     NMS_THRES = 0.4
     NUM_CLASSES = 5
     CLASS_NAMES = ['chip-capacitor', 'chip-resistor', 'diode', 'ic', 'transistor']
@@ -170,8 +170,8 @@ class Inspector:
 
         all_components = []
 
-        # self.motion.go_zero()
-        # self.motion.move_relative(100, 100, feedrate=2000)
+        self.motion.go_zero()
+        self.motion.move_relative(90, 90, feedrate=2000)
         self.motion.set_home() # установить дом в левом верхнем углы платы
 
         for i, (x, y) in enumerate(points):
@@ -244,6 +244,11 @@ class Inspector:
         for det in self.current_detections:
             box = det['box']
             
+            # отсечь элементы у которых площадь менее 200 пикселей
+            area = self.calculate_box_area(box)
+            if area < 200:
+                continue
+
             box_crop = [
                 round(box[0], 4),
                 round(box[1], 4),
@@ -271,6 +276,12 @@ class Inspector:
             })
         
         return components
+    
+    # вычислить площадь элемента
+    def calculate_box_area(self, box):
+        width = box[2] - box[0]
+        height = box[3] - box[1]
+        return width * height
 
     # сохранить результаты в файл
     def save_results(self, components, filename=None):

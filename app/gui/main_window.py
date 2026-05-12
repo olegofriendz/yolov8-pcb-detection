@@ -221,7 +221,7 @@ class MainWindow:
         tk_image = ImageTk.PhotoImage(image=pil_image)
         return tk_image
     
-    # постоянно обновление изображения из inspector.current_frame
+    # постоянное обновление изображения из inspector.current_frame
     def update_display(self):
         frame = self.inspector.get_current_frame()
         if frame is not None:
