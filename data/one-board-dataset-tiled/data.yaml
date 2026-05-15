@@ -8,8 +8,8 @@ nc: 5
 roboflow:
   license: CC BY 4.0
   project: one-board-dataset
-  url: https://universe.roboflow.com/oleg-scesf/one-board-dataset/dataset/8
-  version: 8
+  url: https://universe.roboflow.com/oleg-scesf/one-board-dataset/dataset/9
+  version: 9
   workspace: oleg-scesf
 test: ../test/images
 train: ../train/images
