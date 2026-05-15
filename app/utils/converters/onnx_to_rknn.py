@@ -10,10 +10,11 @@ import cv2
 def convert_onnx_to_rknn(
     onnx_path: str,
     target_platform: str = "rk3588",
-    output_dir: str = "runs/detect/one-board-dataset/weights",
+    output_dir: str = None,
     do_quantization: bool = False,
     dataset_txt: str = None
 ):
+    output_dir = os.path.dirname(onnx_path)
     os.makedirs(output_dir, exist_ok=True)
     
     # 1. Анализ входного ONNX
