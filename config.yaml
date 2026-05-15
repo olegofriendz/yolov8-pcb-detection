@@ -1,7 +1,7 @@
 dataset:
   workspace: "oleg-scesf"
   name: "one-board-dataset"
-  version: 9
+  version: 8
   download_format: "yolov8"
 
 training:
