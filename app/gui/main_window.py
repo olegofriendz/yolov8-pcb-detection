@@ -334,7 +334,8 @@ class MainWindow:
             defect_type_translate = {
                 'MISSING': 'Отсутствует',
                 'EXTRA': 'Лишний',
-                'WRONG_CLASS': 'Не тот класс',
+                'WRONG_SIZE': 'Размер не соответствует/Поворот',
+                'WRONG_CLASS': 'Класс не соответствует',
                 'SHIFTED': 'Сдвинут'
             }
             type_str = defect_type_translate.get(defect['type'], defect['type'])

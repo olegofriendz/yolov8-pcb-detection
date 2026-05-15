@@ -35,7 +35,7 @@ class MotionContoller:
         self.ser.write(f"{cmd}\n".encode())
         response = ""
         while True:
-            line = self.ser.readline().decode().strip()
+            line = self.ser.readline().decode('utf-8', errors='ignore').strip()
             if not line:
                 continue
             response = line

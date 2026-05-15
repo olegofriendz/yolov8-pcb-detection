@@ -171,6 +171,8 @@ class Inspector:
         all_components = []
 
         self.motion.go_zero()
+        self.motion.wait_for_stop()
+        time.sleep(1)
         self.motion.move_relative(90, 90, feedrate=2000)
         self.motion.set_home() # установить дом в левом верхнем углы платы
 
@@ -346,7 +348,8 @@ class Inspector:
         
         return unique
         
-    # сравнение текущей платы с эталоном
+    # сравнение текущей платы с эталоном (добавить сравнение по площади бокса !!!!!!!)
+    # match_distance_mm - расстояние между центрами пар, shift_distance_mm - допустимое смещение 
     def compare_with_standard(self, standard_components, current_components, match_distance_mm, shift_distance_mm) -> list:
         defects = []
         
@@ -355,7 +358,6 @@ class Inspector:
         used_current = set()
 
         print("\n" + "="*50)
-        print(" НАЧАЛО СРАВНЕНИЯ С ЭТАЛОНОМ ")
         print(f" Эталон: {len(standard_components)} элем. | Текущая: {len(current_components)} элем. ")
         print(f" Порог поиска пары: {match_distance_mm} мм | Порог сдвига: {shift_distance_mm} мм")
         print("="*50)
@@ -390,10 +392,34 @@ class Inspector:
             distance = pair['distance']
             
             if pair['same_class']:
+
+                # сравнение по длине и ширине
+                box_s = s_comp['bbox_crop']
+                box_c = c_comp['bbox_crop']
+
+                w_s = box_s[2] - box_s[0]
+                h_s = box_s[3] - box_s[1]
+                w_c = box_c[2] - box_c[0]
+                h_c = box_c[3] - box_c[1]
+                
+                delta_w = abs(w_s - w_c)
+                delta_h = abs(h_s - h_c)
+
+                SIZE_THRESHOLD_PX = 10.0 # порог допустимого сдвига элемента
+
                 # если классы совпали -> проверка сдвига
                 if distance > shift_distance_mm:
                     defects.append({
                         'type': 'SHIFTED',
+                        'standard_comp': s_comp,
+                        'current_comp': c_comp,
+                        'distance': round(distance, 2),
+                        'status': 'pending'
+                    })
+                elif delta_w > SIZE_THRESHOLD_PX or delta_h > SIZE_THRESHOLD_PX:
+                    print(f"[РАЗМЕР/ОРИЕНТАЦИЯ] Эталон #{s_idx} ({s_comp['class_name']} {w_s:.0f}x{h_s:.0f}) + Текущий #{c_idx} ({w_c:.0f}x{h_c:.0f}) -> дельта_w={delta_w:.0f}, дельта_h={delta_h:.0f}")
+                    defects.append({
+                        'type': 'WRONG_SIZE',
                         'standard_comp': s_comp,
                         'current_comp': c_comp,
                         'distance': round(distance, 2),
@@ -453,19 +479,42 @@ class Inspector:
         if defect['type'] == 'MISSING':
             std = defect['standard_comp'] # бокс из эталона
             x1, y1, x2, y2 = [int(v) for v in std['bbox_crop']]
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
             cv2.putText(frame, "Отсутствует", (x1, y1 - 10), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 255), 2)
 
         elif defect['type'] == 'EXTRA':
             cur = defect['current_comp']
             x1, y1, x2, y2 = [int(v) for v in cur['bbox_crop']]
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
             cv2.putText(frame, "Лишний", (x1, y1 - 10), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 255), 2)
 
         elif defect['type'] == 'WRONG_CLASS':
-            pass
+            std = defect['standard_comp']
+            cur = defect['current_comp']
+            x1, y1, x2, y2 = [int(v) for v in std['bbox_crop']]
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+            cv2.putText(frame, f"Ожидаемый: {std['class_name']}", (x1, y2 + 20), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 255), 2)
+
+            x1, y1, x2, y2 = [int(v) for v in cur['bbox_crop']]
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+            cv2.putText(frame, f"Найдено: {cur['class_name']}", (x1, y2 + 40), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 255), 2)
+
         elif defect['type'] == 'SHIFTED':
-            pass
+            std = defect['standard_comp']
+            cur = defect['current_comp']
+            x1, y1, x2, y2 = [int(v) for v in std['bbox_crop']]
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+            cv2.putText(frame, f"Ожидаемый: {std['class_name']}", (x1, y2 + 20), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 255), 2)
+
+            x1, y1, x2, y2 = [int(v) for v in cur['bbox_crop']]
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+            cv2.putText(frame, f"Сдвинут: {cur['class_name']}", (x1, y2 + 40), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 255), 2)
+
+        elif defect['type'] == 'WRONG_SIZE':
+            cur = defect['current_comp']
+            x1, y1, x2, y2 = [int(v) for v in cur['bbox_crop']]
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+            cv2.putText(frame, "Неверный размер/поворот", (x1, y1 - 10), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 255), 2)
 
         return frame
 
