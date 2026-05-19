@@ -28,15 +28,17 @@ class MainWindow:
         modes_frame = tk.LabelFrame(top_panel, text=" Режим работы ", bg='#ffffff', font=("Arial", 10, "bold"), padx=10, pady=8)
         modes_frame.pack(side=tk.LEFT, padx=(10, 5), pady=5, fill='y')
 
-        self.btn_manual = tk.Button(modes_frame, text='Ручное управление', command=self.start_manual, width=16, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
-        self.btn_standard = tk.Button(modes_frame, text='Эталон', command=self.start_scan_standard, width=16, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
+        self.btn_standard = tk.Button(modes_frame, text='Эталон', command=self.start_scan_standard, width=8, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
         self.btn_plate = tk.Button(modes_frame, text='Проверить плату', command=self.start_scan_plate, width=16, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
-        self.btn_go_home = tk.Button(modes_frame, text='🏠',command=self.inspector.motion.home, width=4, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
+        self.btn_manual = tk.Button(modes_frame, text='🛠️', command=self.start_manual, width=3, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
+        self.btn_go_home = tk.Button(modes_frame, text='🏠',command=self.inspector.motion.home, width=3, height=2, bg='#e3f2fd', font=("Arial", 10, "bold"))
+        self.btn_stop = tk.Button(modes_frame, text='⚠️', command=self.stop_scanning, width=3, height=2, bg='#ff3333', fg='white', font=("Arial", 10, "bold"))
         
-        self.btn_manual.pack(side=tk.LEFT, padx=3)
-        self.btn_standard.pack(side=tk.LEFT, padx=3)
-        self.btn_plate.pack(side=tk.LEFT, padx=3)
-        self.btn_go_home.pack(side=tk.LEFT, padx=3)
+        self.btn_standard.pack(side=tk.LEFT, padx=2)
+        self.btn_plate.pack(side=tk.LEFT, padx=2)
+        self.btn_manual.pack(side=tk.LEFT, padx=2)
+        self.btn_go_home.pack(side=tk.LEFT, padx=2)
+        self.btn_stop.pack(side=tk.LEFT, padx=2)
 
         # Центральная часть: инструменты
         tools_frame = tk.LabelFrame(top_panel, text=" Инструменты ", bg='#ffffff', font=("Arial", 10, "bold"), padx=10, pady=8)
@@ -102,7 +104,7 @@ class MainWindow:
             self.inspector.active_defect = None         
             self.mode = 'manual'
             self.inspector.hide_detections = False
-            self.btn_manual.config(text="Ручное управление", relief=tk.SUNKEN)
+            self.btn_manual.config(text="🛠️", relief=tk.SUNKEN)
             self.btn_standard.config(state=tk.DISABLED)
             self.btn_plate.config(state=tk.DISABLED)
             self.status.config(text="Ручное управление", fg="blue")
@@ -110,7 +112,7 @@ class MainWindow:
 
     def stop_manual(self):
         self.mode = None
-        self.btn_manual.config(text="Ручное управление", relief=tk.RAISED)
+        self.btn_manual.config(text="🛠️", relief=tk.RAISED)
         self.btn_standard.config(state=tk.NORMAL)
         self.btn_plate.config(state=tk.NORMAL)
         self.status.config(text="Ручное управление отключено", fg="green")
@@ -207,7 +209,8 @@ class MainWindow:
             else:
                 self.status.config(text=f"Найдено дефектов: {len(defects)}", fg="red")
                 self.btn_next_defect.config(state=tk.NORMAL, text='Показать дефекты')
-                self.inspector.hide_detections = True # включаем режим скрытия контуров элементов если в режиме ошибок
+                self.current_defect_idx = -1
+                self.inspector.hide_detections = False # включаем режим скрытия контуров элементов если в режиме ошибок
         else:
             self.status.config(text="Проверка платы прервана", fg="orange")
             self.btn_next_defect.config(state=tk.DISABLED)
@@ -312,6 +315,7 @@ class MainWindow:
         self.current_defect_idx = found_idx
         defect = self.defects_list[self.current_defect_idx]
         self.btn_next_defect.config(text='Следующий дефект')
+        self.inspector.hide_detections = True
         
         target_comp = defect.get('current_comp') or defect.get('standard_comp') # missing - эталон, другие - плата
         crop_x, crop_y = target_comp['crop_origin_mm']
@@ -354,6 +358,12 @@ class MainWindow:
         self.inspector.active_defect = None
         self.show_next_defect()
 
+    def stop_scanning(self):
+        if self.mode in ['standard', 'plate']:
+            self.inspector.scan_aborted = True
+            self.status.config(text='Остановка сканирования...', fg='orange')
+            self.btn_plate.config(state=tk.NORMAL)
+            self.btn_standard.config(state=tk.NORMAL)
     
     def run(self):
         self.root.mainloop()

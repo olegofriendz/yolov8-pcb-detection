@@ -24,7 +24,7 @@ class Inspector:
     COM_PORT = "/dev/ttyUSB0"
     BAUD_RATE = 115200
     
-    CONF_THRES = 0.65
+    CONF_THRES = 0.7
     NMS_THRES = 0.4
     NUM_CLASSES = 5
     CLASS_NAMES = ['chip-capacitor', 'chip-resistor', 'diode', 'ic', 'transistor']
@@ -64,6 +64,7 @@ class Inspector:
         self.current_detections = []
         self.active_defect = None # дефект для подсветки в кадре после проверки
         self.hide_detections = False # флаг для отображения контуров элементов
+        self.scan_aborted = False # флаг для принудительной остановки
 
         self.running = True
         self.processing_thread = Thread(target=self._process_loop, daemon=True)
@@ -136,7 +137,7 @@ class Inspector:
     
     def draw_info(self, frame, detections, x_off, y_off):
         cv2.rectangle(frame, (x_off, y_off), (x_off + self.CROP_SIZE_PX, y_off + self.CROP_SIZE_PX), (0, 255, 0), 1)
-        info_lines = [f"Detections: {len(detections)}", "Arrows - move", "Z - set home", "H - go home"]
+        info_lines = [f"Detections: {len(detections)}"]
         
         y_pos = 30
         for line in info_lines:
@@ -162,6 +163,7 @@ class Inspector:
 
     # автоматический проход платы
     def scan_plate(self):
+        self.scan_aborted = False
         points = self.generate_snake_points(plate_width=self.PLATE_WIDTH,
                                             plate_height=self.PLATE_HEIGHT,
                                             crop_size_mm=self.CROP_SIZE_MM,
@@ -177,13 +179,17 @@ class Inspector:
         self.motion.set_home() # установить дом в левом верхнем углы платы
 
         for i, (x, y) in enumerate(points):
+            if self.scan_aborted:
+                print("Сканирование завершено принудительно.")
+                break
+
             print(f"[{i+1}/{len(points)}] Движение в ({x:.1f}, {y:.1f})")
             self.motion.move_absolute(x, y, feedrate=2000)
             self.motion.wait_for_stop()
-            time.sleep(2)
-
+            time.sleep(1)
             components = self.scan_at_position(x, y)
             all_components.extend(components)
+            time.sleep(1)
 
         unique_components = self.remove_duplicate_components(all_components, distance_threshold_mm=3.0)
 
@@ -246,6 +252,7 @@ class Inspector:
         for det in self.current_detections:
             box = det['box']
             
+            # отсечь элементы у которых площадь менее 200 пикселей
             # отсечь элементы у которых площадь менее 200 пикселей
             area = self.calculate_box_area(box)
             if area < 200:
@@ -348,7 +355,7 @@ class Inspector:
         
         return unique
         
-    # сравнение текущей платы с эталоном (добавить сравнение по площади бокса !!!!!!!)
+    # сравнение текущей платы с эталоном
     # match_distance_mm - расстояние между центрами пар, shift_distance_mm - допустимое смещение 
     def compare_with_standard(self, standard_components, current_components, match_distance_mm, shift_distance_mm) -> list:
         defects = []
