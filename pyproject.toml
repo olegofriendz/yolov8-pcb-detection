@@ -15,7 +15,9 @@ dependencies = [
     "ultralytics",
     "python-dotenv",
     "pyyaml",
-    "pyserial"
+    "pyserial",
+    "torch>=1.13.1,<=2.2.0",
+    "opencv-python"
 ]
 
 [tool.setuptools.packages.find]

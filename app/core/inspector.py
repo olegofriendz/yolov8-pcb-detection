@@ -540,5 +540,8 @@ class Inspector:
         self.camera.release()
         self.detector.release()
         self.motion.disconnect()
-        cv2.destroyAllWindows()
+        try:
+            cv2.destroyAllWindows()
+        except:
+            pass
         print("Система остановлена.")
