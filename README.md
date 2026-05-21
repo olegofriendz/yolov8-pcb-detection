@@ -2,6 +2,27 @@
 
 Real-time detection and classification of electronic components on printed circuit boards using YOLOv8.
 
+
+## Environment Setup
+
+> **Note:** Python 3.10 is required for Orange Pi to ensure compatibility with the pre-built ARM64 dependencies.
+
+1. **Create and activate a virtual environment:**
+   ```bash
+   python3.10 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+2. **Install architecture-specific dependencies (RKNN Toolkit):**
+   ```bash
+   pip install requirements/arm64/rknn_toolkit2-2.3.2-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl
+   ```
+
+3. **Install the project in editable mode:**
+   ```bash
+   pip install -e .
+   ```
+
 ## Usage
 
 After installation, use CLI commands from any directory:
