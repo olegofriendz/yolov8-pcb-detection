@@ -8,6 +8,7 @@ services:
       - /etc/fonts:/etc/fonts:ro
       - /usr/share/fonts:/usr/share/fonts:ro
       - /usr/lib/librknnrt.so:/usr/lib64/librknnrt.so
+      - ./app/results:/app/app/results
     devices:
       - /dev/video0
       - /dev/ttyUSB0
