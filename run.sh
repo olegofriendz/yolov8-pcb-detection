@@ -1,4 +1,4 @@
 #!/bin/bash
 cd "$(dirname "$0")"
-source .venv/bin/activate
-python app/main.py
+xhost +local:root > /dev/null 2>&1
+docker compose up
