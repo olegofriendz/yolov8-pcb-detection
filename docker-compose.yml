@@ -9,6 +9,7 @@ services:
       - /usr/share/fonts:/usr/share/fonts:ro
       - /usr/lib/librknnrt.so:/usr/lib64/librknnrt.so
       - ./app/results:/app/app/results
+      - .:/app
     devices:
       - /dev/video0
       - /dev/ttyUSB0
