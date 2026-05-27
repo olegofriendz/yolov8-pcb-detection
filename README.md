@@ -59,7 +59,7 @@ The container will start, mount your local code for hot-reloading, and launch th
    python app/main.py
    ```
 
-## Model Conversation Pipeline
+## Model Conversion Pipeline
 
 To deploy models on NPU, follow this conversion chain:
 
