@@ -10,6 +10,14 @@ Real-time detection and classification of electronic components on printed circu
 - **Edge Acceleration:** RKNN Toolkit 2 (for NPU inference on Rockchip SoCs)
 - **Containerization:** Docker & Docker Compose
 
+## Results & Demo
+
+### Training Metrics
+![Training results](runs/detect/one-board-dataset/results.png)
+
+### Real-Time Detection
+![GUI Demo](assets/gui-demo.png)
+
 ## Quick Start
 
 Prerequisites: [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/).
