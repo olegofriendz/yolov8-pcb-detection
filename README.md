@@ -1,3 +1,6 @@
+<a href="./README.md"><b>English</b></a> &nbsp;|&nbsp;
+<a href="./README.ru.md">Русский</a>
+
 # YOLOv8 PCB Detection
 
 Real-time detection and classification of electronic components on printed circuit boards using YOLOv8, optimized for ARM64 edge devices (Raspberry Pi, Orange Pi) with RKNN acceleration.
