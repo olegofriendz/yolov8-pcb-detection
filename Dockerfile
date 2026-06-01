@@ -1,6 +1,6 @@
 FROM python:3.10-slim-bookworm
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglib2.0-0 libxcb1 libxkbcommon0 libtk8.6 tk8.6 \
     cmake build-essential \
     && ldconfig \
