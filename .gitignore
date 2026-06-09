@@ -1,6 +1,7 @@
 check*.onnx
 app/results/*.json
 icon.png
+.github
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -36,7 +36,7 @@ class Inspector:
     PX_PER_MM = CROP_SIZE_PX / CROP_SIZE_MM # количество пикселей в мм
 
     PLATE_WIDTH = 200 # мм
-    PLATE_HEIGHT = 200
+    PLATE_HEIGHT = 180
     OVERLAP_PERCENT = 40 # перекрытие в процентах
 
     STANDARD_FILENAME = "standard_plate.json"
@@ -176,7 +176,9 @@ class Inspector:
         self.motion.wait_for_stop()
         time.sleep(1)
         self.motion.move_relative(90, 90, feedrate=2000)
+        self.motion.wait_for_stop()
         self.motion.set_home() # установить дом в левом верхнем углы платы
+        time.sleep(1)
 
         for i, (x, y) in enumerate(points):
             if self.scan_aborted:
@@ -186,10 +188,10 @@ class Inspector:
             print(f"[{i+1}/{len(points)}] Движение в ({x:.1f}, {y:.1f})")
             self.motion.move_absolute(x, y, feedrate=2000)
             self.motion.wait_for_stop()
-            time.sleep(1)
+            time.sleep(0.5)
             components = self.scan_at_position(x, y)
             all_components.extend(components)
-            time.sleep(1)
+            time.sleep(0.5)
 
         unique_components = self.remove_duplicate_components(all_components, distance_threshold_mm=3.0)
 
@@ -253,7 +255,6 @@ class Inspector:
             box = det['box']
             
             # отсечь элементы у которых площадь менее 200 пикселей
-            # отсечь элементы у которых площадь менее 200 пикселей
             area = self.calculate_box_area(box)
             if area < 200:
                 continue
@@ -271,8 +272,8 @@ class Inspector:
             cx_crop_mm = round((cx / self.CROP_SIZE_PX) * self.CROP_SIZE_MM, 4)
             cy_crop_mm = round((cy / self.CROP_SIZE_PX) * self.CROP_SIZE_MM, 4)
 
-            global_x = round(cx_crop_mm + plate_y, 4)
-            global_y = round(cy_crop_mm + plate_x, 4)
+            global_x = round(cy_crop_mm + plate_y, 4)
+            global_y = round(cx_crop_mm + plate_x, 4)
             
             components.append({
                 'class_name': self.CLASS_NAMES[det['class']],
@@ -495,33 +496,46 @@ class Inspector:
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
             cv2.putText(frame, "Лишний", (x1, y1 - 10), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 255), 2)
 
-        elif defect['type'] == 'WRONG_CLASS':
-            std = defect['standard_comp']
-            cur = defect['current_comp']
-            x1, y1, x2, y2 = [int(v) for v in std['bbox_crop']]
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
-            cv2.putText(frame, f"Ожидаемый: {std['class_name']}", (x1, y2 + 20), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 255), 2)
-
-            x1, y1, x2, y2 = [int(v) for v in cur['bbox_crop']]
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
-            cv2.putText(frame, f"Найдено: {cur['class_name']}", (x1, y2 + 40), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 255), 2)
-
         elif defect['type'] == 'SHIFTED':
             std = defect['standard_comp']
             cur = defect['current_comp']
-            x1, y1, x2, y2 = [int(v) for v in std['bbox_crop']]
+
+            offset_x_mm = std['crop_origin_mm'][1] - cur['crop_origin_mm'][1]  # std_y - cur_y
+            offset_y_mm = std['crop_origin_mm'][0] - cur['crop_origin_mm'][0]  # std_x - cur_x
+            
+            offset_x_px = offset_x_mm * self.PX_PER_MM
+            offset_y_px = offset_y_mm * self.PX_PER_MM
+
+            std_box = std['bbox_crop']
+            x1 = int(std_box[0] + offset_x_px)
+            y1 = int(std_box[1] + offset_y_px)
+            x2 = int(std_box[2] + offset_x_px)
+            y2 = int(std_box[3] + offset_y_px)
+            
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
             cv2.putText(frame, f"Ожидаемый: {std['class_name']}", (x1, y2 + 20), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 255), 2)
 
+            # Рисуем фактическую позицию
             x1, y1, x2, y2 = [int(v) for v in cur['bbox_crop']]
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
-            cv2.putText(frame, f"Сдвинут: {cur['class_name']}", (x1, y2 + 40), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 255), 2)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 255), 2)
+            cv2.putText(frame, f"Сдвинут: {cur['class_name']}", (x1, y2 + 40), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 255, 255), 2)
 
-        elif defect['type'] == 'WRONG_SIZE':
-            cur = defect['current_comp']
-            x1, y1, x2, y2 = [int(v) for v in cur['bbox_crop']]
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
-            cv2.putText(frame, "Неверный размер/поворот", (x1, y1 - 10), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 255), 2)
+        # elif defect['type'] == 'WRONG_CLASS':
+        #     std = defect['standard_comp']
+        #     cur = defect['current_comp']
+        #     x1, y1, x2, y2 = [int(v) for v in std['bbox_crop']]
+        #     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+        #     cv2.putText(frame, f"Ожидаемый: {std['class_name']}", (x1, y2 + 20), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 255), 2)
+
+        #     x1, y1, x2, y2 = [int(v) for v in cur['bbox_crop']]
+        #     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+        #     cv2.putText(frame, f"Найдено: {cur['class_name']}", (x1, y2 + 40), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 255), 2)
+
+        # elif defect['type'] == 'WRONG_SIZE':
+        #     cur = defect['current_comp']
+        #     x1, y1, x2, y2 = [int(v) for v in cur['bbox_crop']]
+        #     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+        #     cv2.putText(frame, "Неверный размер/поворот", (x1, y1 - 10), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 255), 2)
 
         return frame
 

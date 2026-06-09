@@ -63,12 +63,12 @@ class MainWindow:
         size_row = tk.Frame(settings_frame, bg='#ffffff')
         size_row.pack(fill='x', expand=True)
 
-        tk.Label(size_row, text="Ширина:", bg='#ffffff', font=("Arial", 10)).pack(side=tk.LEFT)
+        tk.Label(size_row, text="Высота:", bg='#ffffff', font=("Arial", 10)).pack(side=tk.LEFT)
         self.plate_width_entry = tk.Entry(size_row, width=6, font=("Arial", 10), justify='center')
         self.plate_width_entry.pack(side=tk.LEFT, padx=3)
         self.plate_width_entry.insert(0, str(self.inspector.PLATE_WIDTH))
         
-        tk.Label(size_row, text="Высота:", bg='#ffffff', font=("Arial", 10)).pack(side=tk.LEFT, padx=(10, 0))
+        tk.Label(size_row, text="Ширина:", bg='#ffffff', font=("Arial", 10)).pack(side=tk.LEFT, padx=(10, 0))
         self.plate_height_entry = tk.Entry(size_row, width=6, font=("Arial", 10), justify='center')
         self.plate_height_entry.pack(side=tk.LEFT, padx=3)
         self.plate_height_entry.insert(0, str(self.inspector.PLATE_HEIGHT))
@@ -134,7 +134,7 @@ class MainWindow:
             def run_scan():
                 components = self.inspector.scan_plate()
                 self.inspector.save_results(components, filename="standard_plate.json")
-                self.root.after(0, self.stop_scan_standard())
+                self.root.after(0, self.stop_scan_standard) # ссылка на функцию
             
             Thread(target=run_scan, daemon=True).start() # отдельный поток 
     
@@ -179,11 +179,11 @@ class MainWindow:
                 # не создан эталон
                 except FileNotFoundError as e:
                     self.defects_list = []
-                    self.root.after(0, lambda: self.stop_scan_plate(error=str(e)))
+                    self.root.after(0, lambda err=e: self.stop_scan_plate(error=str(e)))
                     return
                 except Exception as e:
                     self.defects_list = []
-                    self.root.after(0, lambda: self.stop_scan_plate(error=f"Ошибка {e}"))
+                    self.root.after(0, lambda err=e: self.stop_scan_plate(error=f"Ошибка {e}"))
                     return
 
                 self.root.after(0, lambda: self.stop_scan_plate(defects=self.defects_list))
