@@ -177,6 +177,7 @@ class Inspector:
         time.sleep(1)
         self.motion.move_relative(90, 90, feedrate=2000)
         self.motion.wait_for_stop()
+        time.sleep(1)
         self.motion.set_home() # установить дом в левом верхнем углы платы
         time.sleep(1)
 
@@ -272,8 +273,8 @@ class Inspector:
             cx_crop_mm = round((cx / self.CROP_SIZE_PX) * self.CROP_SIZE_MM, 4)
             cy_crop_mm = round((cy / self.CROP_SIZE_PX) * self.CROP_SIZE_MM, 4)
 
-            global_x = round(cy_crop_mm + plate_y, 4)
-            global_y = round(cx_crop_mm + plate_x, 4)
+            global_x = round(cx_crop_mm + plate_y, 4)
+            global_y = round(cy_crop_mm + plate_x, 4)
             
             components.append({
                 'class_name': self.CLASS_NAMES[det['class']],
@@ -332,8 +333,8 @@ class Inspector:
         unique = []
         
         for cls, items in by_class.items():
-            # сортировка по confidence
-            items = sorted(items, key=lambda x: x['confidence'], reverse=True)
+            # items = sorted(items, key=lambda x: x['confidence'], reverse=True) # сортировка по confidence убрана, берём строго первый элемент
+
             used = set()
             
             for i, comp1 in enumerate(items):
