@@ -47,29 +47,40 @@ class MotionContoller:
         if not self.connected:
             return ""
 
-        self.send("G91") # относительные координаты
-        responce = self.send(f"G1 X{x} Y{y} F{feedrate}")
+        responce = self.send(f"G91 G1 X{x} Y{y} F{feedrate}")
         return responce
     
     def move_absolute(self, x, y, feedrate=1000) -> str:
         if not self.connected:
             return ""
 
-        self.send("G90")
-        responce = self.send(f"G1 X{x} Y{y} F{feedrate}")
+        responce = self.send(f"G90 G1 X{x} Y{y} F{feedrate}")
         return responce
     
-    # ожидание остановки
     def wait_for_stop(self):
-        while True:
-            self.ser.write(b"?") # запрос статуса у устройства
-            response = self.ser.readline().decode().strip() # ответ от порта (-> str)
-            
-            if "<Idle" in response:
-                break 
+        time.sleep(0.15) # проверка на ложный Idle
 
-            time.sleep(3)
-    
+        while True:
+            self.ser.write(b"?")
+            time.sleep(0.05)
+
+            status = None
+            while self.ser.in_waiting > 0:
+                line = self.ser.readline().decode().strip()
+                if line.startswith('<') and line.endswith('>'):
+                    status = line
+
+            if status:
+                if "Idle" in status:
+                    break
+                elif "Run" in status or "Home" in status:
+                    pass
+                elif "Alarm" in status:
+                    raise Exception(f"Аварийная остановка: {status}")
+                
+            time.sleep(0.1)
+
+
     # вернуться в созданный ноль
     def home(self):
         if not self.connected:
