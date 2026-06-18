@@ -80,6 +80,30 @@ class MotionContoller:
                 
             time.sleep(0.1)
 
+    # получить координаты станка
+    def get_position(self):
+        """
+        Отправляет GRBL запрос '?' и возвращает текущие координаты станка (X, Y) в мм.
+        Возвращает (None, None) если не удалось получить позицию.
+        """
+        if not self.connected:
+            return None, None
+        try:
+            self.ser.write(b'?\n') # запрос статуса
+            time.sleep(0.05)
+            response = self.ser.readline().decode('utf-8', errors='ignore').strip() # <Idle|MPos:12.345,67.890,0.000|FS:0,0|WCO:0.000,0.000,0.000>
+
+            if 'MPos:' in response:
+                mpos_str = response.split('MPos:')[1].split('|')[0] # извлекаем часть после 'MPos:' до ближайшего '|'
+                x_str, y_str, z_str = mpos_str.split(',')
+                return float(x_str), float(y_str)
+            else:
+                print(f"[Motion] Неожиданный ответ на '?': {response}")
+                return None, None
+        except Exception as e:
+            print(f"[Motion] Ошибка при получении позиции: {e}")
+            return None, None
+
 
     # вернуться в созданный ноль
     def home(self):

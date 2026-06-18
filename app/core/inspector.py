@@ -32,7 +32,7 @@ class Inspector:
     STEP_MM = 4.0 # шаг для ручного управления
 
     CROP_SIZE_PX = 640
-    CROP_SIZE_MM = 90.0 # размер кропа в мм
+    CROP_SIZE_MM = 89.5 # размер кропа в мм
     PX_PER_MM = CROP_SIZE_PX / CROP_SIZE_MM # количество пикселей в мм
 
     PLATE_WIDTH = 200 # мм
@@ -93,6 +93,8 @@ class Inspector:
             frame, x_off=x_off, y_off=y_off
         )
         
+        detections = self.filter_nested_boxes(detections) # отсечь вложенные контуры
+
         # в режиме проверки ошибок контура не отображаются
         if not self.hide_detections:
             frame_with_boxes = self.draw_detections(frame, detections)
@@ -190,9 +192,10 @@ class Inspector:
             self.motion.move_absolute(x, y, feedrate=2000)
             self.motion.wait_for_stop()
             time.sleep(1)
+
             components = self.scan_at_position(x, y)
             all_components.extend(components)
-            time.sleep(0.5)
+            time.sleep(1)
 
         unique_components = self.remove_duplicate_components(all_components, distance_threshold_mm=3.0)
 
@@ -248,46 +251,83 @@ class Inspector:
                 
         return points
 
+
     # получить все элементы в кропе в мм
     def scan_at_position(self, plate_x, plate_y):
-
         components = []
+        
+        # offset кропа внутри полного кадра 1920x1080 (всегда 640 и 220)
+        x_off = (self.FRAME_WIDTH - self.CROP_SIZE_PX) // 2
+        y_off = (self.FRAME_HEIGHT - self.CROP_SIZE_PX) // 2
+        
         for det in self.current_detections:
-            box = det['box']
+            box = det['box'] # координаты в глобальных пикселях
             
-            # отсечь элементы у которых площадь менее 200 пикселей
             area = self.calculate_box_area(box)
             if area < 50:
                 continue
 
-            box_crop = [
-                round(box[0], 4),
-                round(box[1], 4),
-                round(box[2], 4),
-                round(box[3], 4)
-            ] # координаты бокса
+            # перевод в локальные пиксели кропа (от 0 до 640)
+            x1_local = box[0] - x_off
+            y1_local = box[1] - y_off
+            x2_local = box[2] - x_off
+            y2_local = box[3] - y_off
             
-            cx = round((box_crop[0] + box_crop[2]) / 2, 4) # центр бокса
-            cy = round((box_crop[1] + box_crop[3]) / 2, 4)
+            # локальный центр в пикселях
+            cx_local = (x1_local + x2_local) / 2
+            cy_local = (y1_local + y2_local) / 2
             
-            cx_crop_mm = round((cx / self.CROP_SIZE_PX) * self.CROP_SIZE_MM, 4)
-            cy_crop_mm = round((cy / self.CROP_SIZE_PX) * self.CROP_SIZE_MM, 4)
+            # локальные миллиметры (от 0 до CROP_SIZE_PX)
+            cx_crop_mm = (cx_local / self.CROP_SIZE_PX) * self.CROP_SIZE_MM
+            cy_crop_mm = (cy_local / self.CROP_SIZE_PX) * self.CROP_SIZE_MM
 
+            # глобальные координаты платы
             global_x = round(cx_crop_mm + plate_y, 4)
             global_y = round(cy_crop_mm + plate_x, 4)
             
             components.append({
                 'class_name': self.CLASS_NAMES[det['class']],
                 'class_id': det['class'],
-                'bbox_crop': box_crop,
-                'center_px': [cx, cy],
+                'bbox_crop': [round(box[0], 4), round(box[1], 4), round(box[2], 4), round(box[3], 4)], # оставляем глобальные для отрисовки
+                'center_px': [round(cx_local, 4), round(cy_local, 4)],
                 'center_mm': [global_x, global_y],
                 'confidence': round(det['score'], 4),
-                'crop_origin_mm': [plate_x, plate_y] # координаты кропа для перемещения станка (реверс осей)
+                'crop_origin_mm': [plate_x, plate_y] 
             })
-        
+            
         return components
     
+    # отсечь детекции которые полностью лежат внутри другой
+    def filter_nested_boxes(self, detections, area_ratio_threshold=0.5):
+        if not detections or len(detections) <= 1:
+            return detections
+
+        sorted_dets = sorted(detections, key=lambda x: self.calculate_box_area(x['box']), reverse=True)
+        filtered = []
+
+        for current_det in sorted_dets:
+            box_c = current_det['box']
+            is_nested = False
+            
+            for accepted_det in filtered:
+                box_a = accepted_det['box']
+                
+                if (box_c[0] >= box_a[0] and box_c[1] >= box_a[1] and box_c[2] <= box_a[2] and box_c[3] <= box_a[3]):
+                    
+                    area_c = self.calculate_box_area(box_c)
+                    area_a = self.calculate_box_area(box_a)
+                    
+                    if area_c < area_a * area_ratio_threshold:
+                        is_nested = True
+                        break
+            
+            if not is_nested:
+                filtered.append(current_det)
+                
+        return filtered
+        
+
+
     # вычислить площадь элемента
     def calculate_box_area(self, box):
         width = box[2] - box[0]
@@ -333,8 +373,7 @@ class Inspector:
         unique = []
         
         for cls, items in by_class.items():
-            # сортировка по confidence
-            items = sorted(items, key=lambda x: x['confidence'], reverse=True)
+            # items = sorted(items, key=lambda x: x['confidence'], reverse=True) # сортировка по confidence убрана чтобы строго брать первый элемент
 
             used = set()
             
@@ -424,10 +463,11 @@ class Inspector:
                 delta_w = abs(w_s - w_c)
                 delta_h = abs(h_s - h_c)
 
-                SIZE_THRESHOLD_PX = 10.0 # порог допустимого сдвига элемента
+                SIZE_THRESHOLD_PX = 5.0 # порог допустимого сдвига элемента
 
                 # если классы совпали -> проверка сдвига
                 if distance > shift_distance_mm:
+                    print(f"[СДВИГ] Эталон: {box_s} Текущий: {box_c}")
                     defects.append({
                         'type': 'SHIFTED',
                         'standard_comp': s_comp,
@@ -511,18 +551,18 @@ class Inspector:
             std = defect['standard_comp']
             cur = defect['current_comp']
 
-            offset_x_mm = std['crop_origin_mm'][1] - cur['crop_origin_mm'][1]  # std_y - cur_y
-            offset_y_mm = std['crop_origin_mm'][0] - cur['crop_origin_mm'][0]  # std_x - cur_x
+            offset_x_mm = std['crop_origin_mm'][0] - cur['crop_origin_mm'][0]  # std_y - cur_y
+            offset_y_mm = std['crop_origin_mm'][1] - cur['crop_origin_mm'][1]  # std_x - cur_x
             
-            offset_x_px = offset_x_mm * self.PX_PER_MM # возможно ошибка !!!!
-            offset_y_px = offset_y_mm * self.PX_PER_MM
+            offset_x_px = offset_y_mm * self.PX_PER_MM # возможно ошибка !!!!
+            offset_y_px = offset_x_mm * self.PX_PER_MM
 
-            std_box = std['bbox_crop']
-            x1 = int(std_box[0] + offset_x_px)
-            y1 = int(std_box[1] + offset_y_px)
-            x2 = int(std_box[2] + offset_x_px)
-            y2 = int(std_box[3] + offset_y_px)
-            
+            std_box = std['bbox_crop'] # глобальные координаты
+            x1 = int(round(std_box[0] + offset_x_px))
+            y1 = int(round(std_box[1] + offset_y_px))
+            x2 = int(round(std_box[2] + offset_x_px))
+            y2 = int(round(std_box[3] + offset_y_px))
+
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
             cv2.putText(frame, f"Ожидаемый: {std['class_name']}", (x1, y2 + 20), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 255), 2)
 

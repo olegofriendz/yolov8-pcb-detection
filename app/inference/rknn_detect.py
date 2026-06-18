@@ -136,7 +136,7 @@ class RKNNdetect:
 
         detections = self.postprocess(outputs, x_off, y_off, (h, w))
 
-        return detections, crop_frame, (x_off, y_off)
+        return detections, crop_frame, (x_off, y_off) # глобальные координаты
     
 
     def release(self):
