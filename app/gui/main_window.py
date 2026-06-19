@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import filedialog
 import cv2
 import time
 import json
@@ -60,6 +61,7 @@ class MainWindow:
         settings_frame = tk.LabelFrame(top_panel, text=" Параметры платы ", bg='#ffffff', font=("Arial", 10, "bold"), padx=10, pady=8)
         settings_frame.pack(side=tk.LEFT, padx=5, pady=5, fill='y')
 
+        # Первая строка - поля ввода
         size_row = tk.Frame(settings_frame, bg='#ffffff')
         size_row.pack(fill='x', expand=True)
 
@@ -67,16 +69,27 @@ class MainWindow:
         self.plate_width_entry = tk.Entry(size_row, width=6, font=("Arial", 10), justify='center')
         self.plate_width_entry.pack(side=tk.LEFT, padx=3)
         self.plate_width_entry.insert(0, str(self.inspector.PLATE_WIDTH))
-        
+
         tk.Label(size_row, text="Ширина:", bg='#ffffff', font=("Arial", 10)).pack(side=tk.LEFT, padx=(10, 0))
         self.plate_height_entry = tk.Entry(size_row, width=6, font=("Arial", 10), justify='center')
         self.plate_height_entry.pack(side=tk.LEFT, padx=3)
         self.plate_height_entry.insert(0, str(self.inspector.PLATE_HEIGHT))
-        
+
         tk.Label(size_row, text="мм", bg='#ffffff', font=("Arial", 9)).pack(side=tk.LEFT)
-        
-        tk.Button(size_row, text="Применить", command=self.apply_plate_size, bg='#4caf50', fg='white', font=("Arial", 10, "bold"),
-                  height=1).pack(side=tk.LEFT, padx=(10, 0))
+
+        # Вторая строка - кнопки
+        button_row = tk.Frame(settings_frame, bg='#ffffff')
+        button_row.pack(fill='x', expand=True, pady=(8, 0))
+
+        # Настройка равномерного распределения
+        button_row.grid_columnconfigure(0, weight=1)
+        button_row.grid_columnconfigure(1, weight=1)
+        button_row.grid_columnconfigure(2, weight=1)
+
+        tk.Button(button_row, text="Сохранить", command=self.save_plate_size_to_file, bg='#4caf50', fg='white', 
+                font=("Arial", 10, "bold"), height=1, width=12).grid(row=0, column=0, padx=5)
+        tk.Button(button_row, text="Открыть", command=self.load_plate_size_from_file, bg='#4caf50', fg='white', 
+                font=("Arial", 10, "bold"), height=1, width=12).grid(row=0, column=2, padx=5)
 
         # Статус
         status_frame = tk.Frame(top_panel, bg='#ffffff')
@@ -95,6 +108,84 @@ class MainWindow:
         self.root.bind('<Key>', self.on_key_press)
         self.root.focus_set()
         self.update_display()
+
+    # загрузить размеры платы из файла
+    def load_plate_size_from_file(self):
+        filename = filedialog.askopenfilename(
+            title="Выберите файл с размерами платы",
+            filetypes=[("Текстовые файлы", "*.txt"), ("Все файлы", "*.*")],
+            initialdir="app/gui/plate_sizes"
+        )
+
+        if not filename:
+            return
+        
+        try:
+            with open(filename, 'r', encoding='utf-8') as file:
+                content = file.read().strip()
+
+            values = content.split()
+
+            width = float(values[0])
+            height = float(values[1])
+
+            self.plate_width_entry.delete(0, tk.END)
+            self.plate_width_entry.insert(0, str(width))
+
+            self.plate_height_entry.delete(0, tk.END)
+            self.plate_height_entry.insert(0, str(height))
+
+            self.inspector.PLATE_WIDTH = width
+            self.inspector.PLATE_HEIGHT = height
+            self.status.config(text=f"Размер платы: {width} x {height} мм", fg="green")
+
+        except ValueError:
+            self.status.config(text=f"Ошибка. Файл содержит некорректные значения", fg="red")
+        except Exception as e:
+            self.status.config(text=f"Ошибка. Не удалось прочитать файл: {str(e)}", fg="red")
+
+    # создать текстовый файл с высотой и шириной платы
+    def save_plate_size_to_file(self):
+        width = self.plate_width_entry.get().strip()
+        height = self.plate_height_entry.get().strip()
+
+        if not height or not width:
+            self.status.config(text=f"Ошибка. Заполните все поля", fg="red")
+            return
+        
+        try:
+            height = float(height)
+            width = float(width)
+        except ValueError:
+            self.status.config(text=f"Ошибка. Введите коорректный числа", fg="red")
+            return
+        
+        if height <= 0 or width <= 0:
+            self.status.config(text=f"Ошибка. Размеры должны быть положительными", fg="red")
+            return
+        
+        default_filename = f"{int(width)}_{int(height)}.txt"
+
+        filename = filedialog.asksaveasfilename(
+            title="Сохранить размеры платы",
+            initialdir="app/gui/plate_sizes",
+            initialfile=default_filename,
+            defaultextension=".txt",
+            filetypes=[("Текстовые файлы", "*.txt"), ("Все файлы", "*.*")]
+        )
+
+        if not filename:
+            return
+        
+        try:
+            with open(filename, 'w', encoding='utf-8') as file:
+                file.write(f"{width} {height}")
+
+            self.status.config(text=f"Файл с размерами: {width} x {height} мм - успешно создан", fg="green")
+
+        except Exception as e:
+            self.status.config(text=f"Ошибка создания файла с размерами:\n{str(e)}", fg="red")
+    
 
     # ручное управление
     def start_manual(self):
@@ -261,21 +352,6 @@ class MainWindow:
             self.inspector.manual_control_step('set_home')
         elif key == 's':
             self.show_components()
-
-    def apply_plate_size(self):
-        try:
-            width = float(self.plate_width_entry.get())
-            height = float(self.plate_height_entry.get())
-
-            if width <= 0 or height <= 0:
-                raise ValueError("Размеры платы не могут быть отрицательными!")
-            
-            self.inspector.PLATE_WIDTH = width
-            self.inspector.PLATE_HEIGHT = height
-            self.status.config(text=f"Размер платы: {width} x {height} мм", fg="green")
-
-        except ValueError as e:
-            self.status.config(text=f"Ошибка: неверный ввод!", fg="red")
 
     # прочитать файл эталона
     def load_standard_components(self):
