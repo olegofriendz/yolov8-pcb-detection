@@ -183,6 +183,8 @@ class Inspector:
         self.motion.set_home() # установить дом в левом верхнем углы платы
         time.sleep(0.3)
 
+        FRAMES_PER_POINT = 5 # количество кадров в одной точке
+
         for i, (x, y) in enumerate(points):
             if self.scan_aborted:
                 print("Сканирование завершено принудительно.")
@@ -193,8 +195,17 @@ class Inspector:
             self.motion.wait_for_stop()
             time.sleep(1)
 
-            components = self.scan_at_position(x, y)
-            all_components.extend(components)
+            position_components = [] # детекции из нескольких кадров в одном кадре
+            for i in range(FRAMES_PER_POINT):
+                components = self.scan_at_position(x, y)
+                position_components.extend(components)
+                print(f"Кадр {i} | Найдено: {len(position_components)}")
+                time.sleep(0.2)
+
+            unique_at_position = self.remove_duplicate_components(position_components, distance_threshold_mm=3.0)
+            print(f"-> Найдено: {len(position_components)}, уникальных: {len(unique_at_position)}")
+
+            all_components.extend(unique_at_position)
             time.sleep(1)
 
         unique_components = self.remove_duplicate_components(all_components, distance_threshold_mm=3.0)
