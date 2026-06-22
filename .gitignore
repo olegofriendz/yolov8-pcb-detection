@@ -2,6 +2,7 @@ check*.onnx
 app/results/*.json
 icon.png
 .github
+app/gui/plate_sizes/*.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -446,8 +446,8 @@ class Inspector:
                         'size_diff': abs(w_s - w_c) + abs(h_s - h_c) # суммарная разница
                     })
 
-        # сортировка пар по классу, разнице размеров, расстоянию от центров
-        pairs.sort(key=lambda x: (not x['same_class'], x['size_diff'], x['distance']))
+        # сортировка пар по классу, расстоянию от центров, разнице размеров
+        pairs.sort(key=lambda x: (not x['same_class'], x['distance'], x['size_diff']))
         
         for pair in pairs:
             s_idx, c_idx = pair['s_idx'], pair['c_idx']
@@ -565,7 +565,7 @@ class Inspector:
             offset_x_mm = std['crop_origin_mm'][0] - cur['crop_origin_mm'][0]  # std_y - cur_y
             offset_y_mm = std['crop_origin_mm'][1] - cur['crop_origin_mm'][1]  # std_x - cur_x
             
-            offset_x_px = offset_y_mm * self.PX_PER_MM # возможно ошибка !!!!
+            offset_x_px = offset_y_mm * self.PX_PER_MM
             offset_y_px = offset_x_mm * self.PX_PER_MM
 
             std_box = std['bbox_crop'] # глобальные координаты
