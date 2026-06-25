@@ -209,6 +209,7 @@ class Inspector:
             time.sleep(1)
 
         unique_components = self.remove_duplicate_components(all_components, distance_threshold_mm=3.0)
+        unique_components = self.filter_components_inside_ic(unique_components) # отсечь ложные элементы которые находятся внутри других
 
         print(f"Всего найдено компонентов: {len(all_components)}")
         print(f"Компонентов после фильтрации: {len(unique_components)}")
@@ -663,7 +664,53 @@ class Inspector:
             return False
 
 
-    # [ОТСУТСТВУЕТ] Эталон #42 (ic @ [112.6267, 139.634]) - НЕ НАШЕЛ ПАРЫ В РАДИУСЕ 4.0 мм
+    # отсечь мелкие детали, попавшие внутрь крупных элементов (ИС) и которые ложно детектируются
+    def filter_components_inside_ic(self, components):
+        if not components:
+            return components
+            
+        ics = [c for c in components if c['class_name'] == 'ic']
+        others = [c for c in components if c['class_name'] != 'ic']
+        
+        if not ics:
+            return components
+            
+        filtered_others = []
+        
+        for other in others:
+            is_inside_ic = False
+            ox, oy = other['center_mm']
+            
+            for ic in ics:
+                box = ic['bbox_crop']
+                w_px = box[2] - box[0]
+                h_px = box[3] - box[1]
+                
+                w_mm = w_px / self.PX_PER_MM
+                h_mm = h_px / self.PX_PER_MM
+                
+                # берем половину размера
+                half_w = w_mm / 2.0
+                half_h = h_mm / 2.0
+                
+                min_x = ic['center_mm'][0] - half_w
+                max_x = ic['center_mm'][0] + half_w
+                
+                min_y = ic['center_mm'][1] - half_h
+                max_y = ic['center_mm'][1] + half_h
+                
+                if min_x <= ox <= max_x and min_y <= oy <= max_y:
+                    is_inside_ic = True
+                    print(f"[ФИЛЬТР ИС] Отсечен {other['class_name']} @ {ox:.2f},{oy:.2f} - внутри ИС @ {ic['center_mm']}")
+                    print(f"   -> Размер рамки ИС: {w_mm:.1f}x{h_mm:.1f} мм. Границы: X[{min_x:.1f}..{max_x:.1f}], Y[{min_y:.1f}..{max_y:.1f}]")
+                    break
+                    
+            if not is_inside_ic:
+                filtered_others.append(other)
+                
+        return ics + filtered_others
+            
+
 
     # получить последний кадр для gui
     def get_current_frame(self):
