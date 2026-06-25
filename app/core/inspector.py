@@ -37,7 +37,7 @@ class Inspector:
 
     PLATE_WIDTH = 200 # мм
     PLATE_HEIGHT = 180
-    OVERLAP_PERCENT = 40 # перекрытие в процентах
+    OVERLAP_PERCENT = 50 # перекрытие в процентах
 
     STANDARD_FILENAME = "standard_plate.json"
 
@@ -600,6 +600,70 @@ class Inspector:
             cv2.putText(frame, "Неверный размер/поворот", (x1, y1 - 10), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 255), 2)
 
         return frame
+
+    # ручная корректировка файла эталона при ложном срабатывании, перезапись json файла
+    def correct_false_positive(self, defect, standard_components):
+
+        defect_type = defect.get('type')
+        std_comp = defect.get('standard_comp')
+        cur_comp = defect.get('current_comp')
+        
+        modified = False
+        idx_to_update = -1
+        
+        # если в дефекте есть эталонный компонент, ищем его индекс в списке
+        if std_comp:
+            for i, comp in enumerate(standard_components):
+                # поиск по точному совпадению координат центра эталона
+                if (comp['center_mm'][0] == std_comp['center_mm'][0] and comp['center_mm'][1] == std_comp['center_mm'][1]):
+                    idx_to_update = i
+                    break
+        
+        # ЛИШНИЙ -> добавляем текущий элемент в эталон
+        if defect_type == 'EXTRA' and cur_comp:
+            standard_components.append(cur_comp.copy())
+            print(">> [Адаптация] Лишний элемент добавлен в эталон.")
+            modified = True
+            
+        # ОТСУТСТВУЕТ -> удаляем элемент из эталона
+        elif defect_type == 'MISSING' and idx_to_update != -1:
+            # standard_components.pop(idx_to_update)
+            # print(">> [Адаптация] Отсутствующий элемент удален из эталона.")
+            modified = True
+            
+        # СДВИНУТ -> обновляем координаты эталона на текущие
+        elif defect_type == 'SHIFTED' and idx_to_update != -1 and cur_comp:
+            standard_components[idx_to_update]['center_mm'] = cur_comp['center_mm']
+            standard_components[idx_to_update]['center_px'] = cur_comp['center_px'] 
+            standard_components[idx_to_update]['bbox_crop'] = cur_comp['bbox_crop']
+            standard_components[idx_to_update]['crop_origin_mm'] = cur_comp['crop_origin_mm']
+            print(">> [Адаптация] Сдвинутый элемент: координаты в эталоне обновлены.")
+            modified = True
+            
+        # НЕВЕРНЫЙ РАЗМЕР -> обновляем бокс в эталоне на текущий
+        elif defect_type == 'WRONG_SIZE' and idx_to_update != -1 and cur_comp:
+            standard_components[idx_to_update]['bbox_crop'] = cur_comp['bbox_crop']
+            standard_components[idx_to_update]['crop_origin_mm'] = cur_comp['crop_origin_mm']
+            print(">> [Адаптация] Неверный размер: бокс в эталоне обновлен.")
+            modified = True
+            
+        # НЕВЕРНЫЙ КЛАСС -> меняем класс в эталоне
+        elif defect_type == 'WRONG_CLASS' and idx_to_update != -1 and cur_comp:
+            standard_components[idx_to_update]['class_name'] = cur_comp['class_name']
+            standard_components[idx_to_update]['class_id'] = cur_comp['class_id']
+            print(">> [Адаптация] Неверный класс: класс в эталоне изменен.")
+            modified = True
+            
+        # сохраняем изменения в файл, если были модификации
+        if modified:
+            self.save_results(standard_components, filename=self.STANDARD_FILENAME)
+            return True
+        else:
+            print(">> [Адаптация] Не удалось применить корректировку (элемент не найден в эталоне).")
+            return False
+
+
+    # [ОТСУТСТВУЕТ] Эталон #42 (ic @ [112.6267, 139.634]) - НЕ НАШЕЛ ПАРЫ В РАДИУСЕ 4.0 мм
 
     # получить последний кадр для gui
     def get_current_frame(self):

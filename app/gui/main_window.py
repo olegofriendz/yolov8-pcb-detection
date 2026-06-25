@@ -51,7 +51,7 @@ class MainWindow:
         # Разделитель
         tk.Frame(tools_frame, bg='#e0e0e0', width=2, height=35).pack(side=tk.LEFT, padx=8, fill='y')
 
-        self.btn_1 = tk.Button(tools_frame, command=self.resolve_defect, text='Ложное срабатывание', width=20, height=2, bg='#f44336', fg='white', font=("Arial", 10, "bold"))
+        self.btn_1 = tk.Button(tools_frame, command=self.correct_false_positive, text='Ложное срабатывание', width=20, height=2, bg='#f44336', fg='white', font=("Arial", 10, "bold"))
         self.btn_2 = tk.Button(tools_frame, command=self.resolve_defect, text='Дефект исправлен', width=16, height=2, bg='#228c22', fg='white', font=("Arial", 10, "bold"))
         
         self.btn_1.pack(side=tk.LEFT, padx=2)
@@ -424,6 +424,36 @@ class MainWindow:
             self.root.after(0, lambda: self.status.config(text=f"Ошибка {display_num}/{total_defects}: {type_str} ({target_comp['class_name']})", fg="red"))
 
         Thread(target=move_and_show, daemon=True).start()
+
+    # обработка ложного срабатывания (адаптация эталона)
+    def correct_false_positive(self):
+        if self.current_defect_idx < 0 or self.current_defect_idx >= len(self.defects_list):
+            return
+        
+        defect = self.defects_list[self.current_defect_idx]
+        
+        try:
+            # 1. Загружаем актуальный эталон из файла
+            standard_components = self.load_standard_components()
+            
+            # 2. Передаем дефект и эталон в инспектор для модификации
+            success = self.inspector.correct_false_positive(defect, standard_components)
+            
+            if success:
+                # 3. Помечаем дефект как обработанный
+                self.defects_list[self.current_defect_idx]['status'] = 'resolved'
+                self.inspector.active_defect = None
+                self.status.config(text="Эталон успешно обновлен!", fg="blue")
+                
+                # 4. Переходим к следующему дефекту
+                self.show_next_defect()
+            else:
+                self.status.config(text="Ошибка: не удалось найти элемент в эталоне для обновления", fg="red")
+                
+        except FileNotFoundError:
+            self.status.config(text="Ошибка: файл эталона не найден", fg="red")
+        except Exception as e:
+            self.status.config(text=f"Ошибка адаптации: {e}", fg="red")
 
     # пометить дефект в списке чтобы не возвращаться к нему
     def resolve_defect(self):
