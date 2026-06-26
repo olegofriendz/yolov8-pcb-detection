@@ -276,7 +276,8 @@ class Inspector:
             box = det['box'] # координаты в глобальных пикселях
             
             area = self.calculate_box_area(box)
-            if area < 50:
+            if area < 300:
+                print(f'удалён элемент с площадью {area}')
                 continue
 
             # перевод в локальные пиксели кропа (от 0 до 640)
@@ -475,7 +476,7 @@ class Inspector:
                 delta_w = abs(w_s - w_c)
                 delta_h = abs(h_s - h_c)
 
-                SIZE_THRESHOLD_PX = 5.0 # порог допустимого сдвига элемента
+                SIZE_THRESHOLD_PX = 8.0 # порог допустимого сдвига элемента
 
                 # если классы совпали -> проверка сдвига
                 if distance > shift_distance_mm:
