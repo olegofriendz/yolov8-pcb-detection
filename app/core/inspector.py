@@ -35,8 +35,12 @@ class Inspector:
     CROP_SIZE_MM = 89.5 # размер кропа в мм
     PX_PER_MM = CROP_SIZE_PX / CROP_SIZE_MM # количество пикселей в мм
 
-    PLATE_WIDTH = 200 # мм
-    PLATE_HEIGHT = 180
+    PLATE_WIDTH = 181 # мм
+    PLATE_HEIGHT = 276
+
+    PLATE_WIDTH_SNAKE = PLATE_WIDTH - CROP_SIZE_MM * 0.7
+    PLATE_HEIGHT_SNAKE = PLATE_HEIGHT - CROP_SIZE_MM * 0.7
+
     OVERLAP_PERCENT = 50 # перекрытие в процентах
 
     STANDARD_FILENAME = "standard_plate.json"
@@ -166,8 +170,8 @@ class Inspector:
     # автоматический проход платы
     def scan_plate(self):
         self.scan_aborted = False
-        points = self.generate_snake_points(plate_width=self.PLATE_WIDTH,
-                                            plate_height=self.PLATE_HEIGHT,
+        points = self.generate_snake_points(plate_width=self.PLATE_WIDTH_SNAKE,
+                                            plate_height=self.PLATE_HEIGHT_SNAKE,
                                             crop_size_mm=self.CROP_SIZE_MM,
                                             overlap_percent=self.OVERLAP_PERCENT)
         print(f"Всего точек: {len(points)}")
